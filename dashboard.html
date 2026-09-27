@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Parcel Box Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0B0F14;
+    --panel: #121822;
+    --panel-alt: #0F141C;
+    --border: #212A35;
+    --border-soft: #1A222C;
+    --text: #E7ECF2;
+    --text-dim: #7C8896;
+    --text-faint: #4C5866;
+    --amber: #E8A33D;
+    --amber-dim: #4A3A1C;
+    --teal: #34B27B;
+    --teal-dim: #163A2A;
+    --red: #E2574C;
+    --red-dim: #3D1E1B;
+    --blue: #4C8DFF;
+    --blue-dim: #182A47;
+    --radius: 6px;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-sizing: border-box;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+  }
+  .mono { font-family: 'IBM Plex Mono', 'Consolas', monospace; }
+
+  /* ---------- Header ---------- */
+  header {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+  }
+  .brand .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text-faint);
+    flex-shrink: 0;
+  }
+  .brand .dot.live { background: var(--teal); box-shadow: 0 0 0 0 rgba(52,178,123,.6); animation: pulse 2s infinite; }
+  .brand .dot.down { background: var(--red); }
+  .brand .dot.connecting { background: var(--amber); }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(52,178,123,.5); }
+    70% { box-shadow: 0 0 0 6px rgba(52,178,123,0); }
+    100% { box-shadow: 0 0 0 0 rgba(52,178,123,0); }
+  }
+  .conn-label { font-size: 12px; color: var(--text-dim); }
+  header .spacer { flex: 1; }
+  .conn-form {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  input {
+    background: var(--panel-alt);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    font-size: 12.5px;
+    font-family: 'IBM Plex Mono', monospace;
+    outline: none;
+  }
+  input:focus { border-color: var(--blue); }
+  input::placeholder { color: var(--text-faint); }
+  .conn-form input[data-field="base"] { width: 200px; }
+  .conn-form input[data-field="key"] { width: 140px; }
+  button {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--panel-alt);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  button:hover { border-color: var(--text-dim); }
+  button:active { transform: translateY(1px); }
+  button.primary {
+    background: var(--amber);
+    border-color: var(--amber);
+    color: #1B140A;
+  }
+  button.primary:hover { background: #f0ac4c; }
+  button.primary:disabled {
+    background: var(--amber-dim);
+    border-color: var(--amber-dim);
+    color: var(--text-faint);
+    cursor: not-allowed;
+  }
+
+  /* ---------- Layout ---------- */
+  main {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 16px;
+  }
+  @media (max-width: 860px) {
+    main { grid-template-columns: 1fr; }
+  }
+  section.panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-head {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-soft);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-head h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+  }
+  .panel-head .count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    color: var(--text-faint);
+  }
+
+  /* ---------- Live feed ---------- */
+  #feed {
+    height: 480px;
+    overflow-y: auto;
+    padding: 10px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+  }
+  .feed-line {
+    display: flex;
+    gap: 10px;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border-soft);
+    align-items: baseline;
+  }
+  .feed-line .ts { color: var(--text-faint); flex-shrink: 0; }
+  .feed-line .badge {
+    flex-shrink: 0;
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    letter-spacing: .3px;
+  }
+  .badge.granted { background: var(--teal-dim); color: var(--teal); }
+  .badge.denied { background: var(--red-dim); color: var(--red); }
+  .badge.capture { background: var(--blue-dim); color: var(--blue); }
+  .badge.unlock { background: var(--amber-dim); color: var(--amber); }
+  .badge.mqtt { background: #1A2230; color: var(--text-dim); }
+  .feed-line .dev { color: var(--text); flex-shrink: 0; }
+  .feed-line .detail { color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #feed .empty { color: var(--text-faint); padding: 30px 0; text-align: center; font-family: 'IBM Plex Sans', sans-serif; }
+
+  /* ---------- Unlock control ---------- */
+  .field { margin-bottom: 10px; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-bottom: 4px;
+    font-weight: 600;
+    letter-spacing: .2px;
+  }
+  .field input { width: 100%; }
+  #unlock-panel { padding: 14px 16px; }
+  #unlock-panel button.primary { width: 100%; margin-top: 4px; }
+  #unlock-status { font-size: 12px; margin-top: 10px; min-height: 16px; font-family: 'IBM Plex Mono', monospace; }
+  #unlock-status.ok { color: var(--teal); }
+  #unlock-status.err { color: var(--red); }
+
+  /* ---------- Device status ---------- */
+  #devices { padding: 6px 0; }
+  .device-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .device-row:last-child { border-bottom: none; }
+  .device-row .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .device-row .dot.on { background: var(--teal); }
+  .device-row .dot.off { background: var(--text-faint); }
+  .device-row .id { font-family: 'IBM Plex Mono', monospace; font-size: 13px; flex: 1; }
+  .device-row .meta { font-size: 11px; color: var(--text-dim); font-family: 'IBM Plex Mono', monospace; }
+  .batt-bar { width: 44px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .batt-bar > div { height: 100%; background: var(--teal); }
+  #devices .empty { color: var(--text-faint); padding: 20px 16px; font-size: 12.5px; }
+
+  /* ---------- Access log table ---------- */
+  #log-panel { grid-column: 1 / -1; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  thead th {
+    text-align: left;
+    padding: 9px 16px;
+    font-size: 11px;
+    color: var(--text-faint);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-soft);
+    letter-spacing: .2px;
+  }
+  tbody td {
+    padding: 9px 16px;
+    border-bottom: 1px solid var(--border-soft);
+    color: var(--text-dim);
+  }
+  tbody tr:hover { background: var(--panel-alt); }
+  tbody td.mono { font-family: 'IBM Plex Mono', monospace; color: var(--text); }
+  .pill {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 3px;
+  }
+  .pill.granted { background: var(--teal-dim); color: var(--teal); }
+  .pill.denied { background: var(--red-dim); color: var(--red); }
+  .pill.error { background: var(--red-dim); color: var(--red); }
+  #log-table-wrap { max-height: 340px; overflow-y: auto; }
+  #log-empty { padding: 24px 16px; color: var(--text-faint); font-size: 12.5px; }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .brand .dot.live { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="dot down" id="ws-dot"></span>
+    <span>PARCEL BOX CONTROL</span>
+  </div>
+  <span class="conn-label" id="ws-label">disconnected</span>
+  <div class="spacer"></div>
+  <div class="conn-form">
+    <input data-field="base" id="base-url" type="text" placeholder="http://127.0.0.1:8000">
+    <input data-field="key" id="api-key" type="password" placeholder="X-API-Key">
+    <input data-field="token" id="dashboard-token" type="password" placeholder="Dashboard Token">
+    <button id="connect-btn">Connect</button>
+  </div>
+</header>
+
+<main>
+  <section class="panel">
+    <div class="panel-head">
+      <h2>LIVE FEED</h2>
+      <span class="count" id="feed-count">0 events</span>
+    </div>
+    <div id="feed"><div class="empty">รอการเชื่อมต่อ — กด Connect ด้านบน</div></div>
+  </section>
+
+  <div style="display:flex; flex-direction:column; gap:16px;">
+    <section class="panel">
+      <div class="panel-head"><h2>UNLOCK CONTROL</h2></div>
+      <div id="unlock-panel">
+        <div class="field">
+          <label>DEVICE ID</label>
+          <input id="unlock-device" type="text" placeholder="box-01" value="box-01">
+        </div>
+        <div class="field">
+          <label>REASON</label>
+          <input id="unlock-reason" type="text" placeholder="manual_override" value="manual_override">
+        </div>
+        <button class="primary" id="unlock-btn">Send Unlock</button>
+        <div id="unlock-status"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>DEVICE STATUS</h2>
+        <span class="count" id="device-count">0</span>
+      </div>
+      <div id="devices"><div class="empty">ยังไม่มีข้อมูลอุปกรณ์</div></div>
+    </section>
+  </div>
+
+  <section class="panel" id="log-panel">
+    <div class="panel-head">
+      <h2>ACCESS LOG</h2>
+      <button id="refresh-log-btn" style="padding:4px 10px; font-size:11px;">Refresh</button>
+    </div>
+    <div id="log-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>TIME</th>
+            <th>DEVICE</th>
+            <th>EVENT</th>
+            <th>RESULT</th>
+            <th>NOTES</th>
+          </tr>
+        </thead>
+        <tbody id="log-body"></tbody>
+      </table>
+      <div id="log-empty" style="display:none;">ยังไม่มี access log — ลองกด Refresh หลังเชื่อมต่อ</div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  const $ = (sel) => document.querySelector(sel);
+
+  const state = {
+    base: '',
+    apiKey: '',
+    dashboardToken: '',
+    ws: null,
+    wsRetryMs: 1000,
+    eventCount: 0,
+    devices: new Map(), // device_id -> { lastSeen, battery, door, online }
+  };
+
+  // ---------- Persisted connection settings ----------
+  function loadSettings() {
+    try {
+      state.base = localStorage.getItem('pb_base') || window.location.origin;
+      state.apiKey = localStorage.getItem('pb_key') || '';
+      state.dashboardToken = localStorage.getItem('pb_token') || '';
+    } catch (e) {
+      state.base = window.location.origin;
+    }
+    $('#base-url').value = state.base;
+    $('#api-key').value = state.apiKey;
+    $('#dashboard-token').value = state.dashboardToken;
+  }
+  function saveSettings() {
+    state.base = $('#base-url').value.trim().replace(/\/$/, '');
+    state.apiKey = $('#api-key').value.trim();
+    state.dashboardToken = $('#dashboard-token').value.trim();
+    try {
+      localStorage.setItem('pb_base', state.base);
+      localStorage.setItem('pb_key', state.apiKey);
+      localStorage.setItem('pb_token', state.dashboardToken);
+    } catch (e) { /* ignore */ }
+  }
+
+  // ---------- WebSocket ----------
+  function setWsStatus(mode, label) {
+    const dot = $('#ws-dot');
+    dot.className = 'dot ' + mode;
+    $('#ws-label').textContent = label;
+  }
+
+  function connectWs() {
+    if (state.ws) { try { state.ws.close(); } catch (e) {} }
+    const wsUrl = state.base.replace(/^http/, 'ws') + '/ws/dashboard'
+      + (state.dashboardToken ? '?token=' + encodeURIComponent(state.dashboardToken) : '');
+    setWsStatus('connecting', 'connecting…');
+    let ws;
+    try {
+      ws = new WebSocket(wsUrl);
+    } catch (e) {
+      setWsStatus('down', 'invalid server url');
+      return;
+    }
+    state.ws = ws;
+
+    ws.onopen = () => {
+      setWsStatus('live', 'connected — ' + wsUrl);
+      state.wsRetryMs = 1000;
+    };
+    ws.onclose = () => {
+      setWsStatus('down', 'disconnected — retrying…');
+      setTimeout(connectWs, state.wsRetryMs);
+      state.wsRetryMs = Math.min(state.wsRetryMs * 1.6, 15000);
+    };
+    ws.onerror = () => { /* onclose will fire next, handled there */ };
+    ws.onmessage = (msg) => {
+      try {
+        const event = JSON.parse(msg.data);
+        handleEvent(event);
+      } catch (e) {
+        console.warn('Non-JSON WS message', msg.data);
+      }
+    };
+  }
+
+  // ---------- Live feed rendering ----------
+  function fmtTime(d) {
+    return d.toTimeString().slice(0, 8);
+  }
+
+  function classify(event) {
+    if (event.event === 'qr_verified') {
+      return event.granted
+        ? { badge: 'granted', label: 'GRANTED', detail: event.reason || '' }
+        : { badge: 'denied', label: 'DENIED', detail: event.reason || '' };
+    }
+    if (event.event === 'image_captured') {
+      return { badge: 'capture', label: 'CAPTURE', detail: event.image_path || '' };
+    }
+    if (event.event === 'unlock_requested') {
+      return { badge: 'unlock', label: 'UNLOCK', detail: 'manual command sent' };
+    }
+    if (event.source === 'mqtt') {
+      const topic = event.topic || '';
+      const kind = topic.includes('/status') ? 'STATUS' : topic.includes('/event') ? 'EVENT' : 'MQTT';
+      return { badge: 'mqtt', label: kind, detail: JSON.stringify(event.payload || {}) };
+    }
+    return { badge: 'mqtt', label: (event.event || 'EVENT').toUpperCase(), detail: '' };
+  }
+
+  function handleEvent(event) {
+    state.eventCount += 1;
+    $('#feed-count').textContent = state.eventCount + ' events';
+
+    const feed = $('#feed');
+    const empty = feed.querySelector('.empty');
+    if (empty) empty.remove();
+
+    const info = classify(event);
+    const line = document.createElement('div');
+    line.className = 'feed-line';
+    line.innerHTML =
+      '<span class="ts">' + fmtTime(new Date()) + '</span>' +
+      '<span class="badge ' + info.badge + '">' + info.label + '</span>' +
+      '<span class="dev">' + (event.device_id || '—') + '</span>' +
+      '<span class="detail">' + escapeHtml(info.detail) + '</span>';
+    feed.prepend(line);
+
+    while (feed.children.length > 200) feed.removeChild(feed.lastChild);
+
+    updateDevice(event);
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+  }
+
+  // ---------- Device status ----------
+  function updateDevice(event) {
+    const id = event.device_id;
+    if (!id || id === 'unknown') return;
+
+    const prev = state.devices.get(id) || {};
+    const payload = (event.source === 'mqtt' && event.payload) ? event.payload : {};
+
+    state.devices.set(id, {
+      lastSeen: Date.now(),
+      battery: (typeof payload.battery === 'number') ? payload.battery : prev.battery,
+      door: payload.door || prev.door,
+    });
+    renderDevices();
+  }
+
+  function renderDevices() {
+    const wrap = $('#devices');
+    $('#device-count').textContent = state.devices.size;
+    if (state.devices.size === 0) {
+      wrap.innerHTML = '<div class="empty">ยังไม่มีข้อมูลอุปกรณ์</div>';
+      return;
+    }
+    const rows = [...state.devices.entries()].map(([id, d]) => {
+      const online = (Date.now() - d.lastSeen) < 90000;
+      const battPct = (typeof d.battery === 'number') ? Math.max(0, Math.min(100, d.battery)) : null;
+      const meta = [
+        d.door ? ('door: ' + d.door) : null,
+        battPct !== null ? (battPct + '%') : null,
+      ].filter(Boolean).join(' · ');
+      return (
+        '<div class="device-row">' +
+        '<span class="dot ' + (online ? 'on' : 'off') + '"></span>' +
+        '<span class="id">' + escapeHtml(id) + '</span>' +
+        (battPct !== null ? '<span class="batt-bar"><div style="width:' + battPct + '%"></div></span>' : '') +
+        '<span class="meta">' + escapeHtml(meta || (online ? 'online' : 'offline')) + '</span>' +
+        '</div>'
+      );
+    }).join('');
+    wrap.innerHTML = rows;
+  }
+
+  setInterval(renderDevices, 15000); // decay "online" state even with no new events
+
+  // ---------- REST: unlock ----------
+  async function sendUnlock() {
+    const btn = $('#unlock-btn');
+    const statusEl = $('#unlock-status');
+    const device_id = $('#unlock-device').value.trim();
+    const reason = $('#unlock-reason').value.trim() || 'manual_override';
+    if (!device_id) {
+      statusEl.textContent = 'ใส่ Device ID ก่อน';
+      statusEl.className = 'err';
+      return;
+    }
+    btn.disabled = true;
+    statusEl.textContent = 'sending…';
+    statusEl.className = '';
+    try {
+      const res = await fetch(state.base + '/api/hardware/unlock', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': state.apiKey,
+        },
+        body: JSON.stringify({ device_id, reason }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        statusEl.textContent = 'sent — ' + (body.status || res.status);
+        statusEl.className = 'ok';
+      } else {
+        statusEl.textContent = 'error ' + res.status + ': ' + (body.detail || res.statusText);
+        statusEl.className = 'err';
+      }
+    } catch (e) {
+      statusEl.textContent = 'network error: ' + e.message;
+      statusEl.className = 'err';
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ---------- REST: access logs ----------
+  async function loadLogs() {
+    const body = $('#log-body');
+    const emptyEl = $('#log-empty');
+    try {
+      const res = await fetch(state.base + '/api/hardware/logs?limit=50', {
+        headers: { 'X-API-Key': state.apiKey },
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const rows = await res.json();
+      if (!rows.length) {
+        body.innerHTML = '';
+        emptyEl.style.display = 'block';
+        return;
+      }
+      emptyEl.style.display = 'none';
+      body.innerHTML = rows.map((r) => {
+        const pillClass = r.result === 'granted' ? 'granted' : r.result === 'denied' ? 'denied' : 'error';
+        const time = new Date(r.created_at).toLocaleString('th-TH', { hour12: false });
+        return (
+          '<tr>' +
+          '<td class="mono">' + escapeHtml(time) + '</td>' +
+          '<td class="mono">' + escapeHtml(r.device_id) + '</td>' +
+          '<td>' + escapeHtml(r.event_type) + '</td>' +
+          '<td><span class="pill ' + pillClass + '">' + escapeHtml(r.result) + '</span></td>' +
+          '<td>' + escapeHtml(r.notes || '') + '</td>' +
+          '</tr>'
+        );
+      }).join('');
+    } catch (e) {
+      body.innerHTML = '';
+      emptyEl.style.display = 'block';
+      emptyEl.textContent = 'โหลด log ไม่สำเร็จ: ' + e.message;
+    }
+  }
+
+  // ---------- Wire up ----------
+  $('#connect-btn').addEventListener('click', () => {
+    saveSettings();
+    connectWs();
+    loadLogs();
+  });
+  $('#unlock-btn').addEventListener('click', sendUnlock);
+  $('#refresh-log-btn').addEventListener('click', loadLogs);
+
+  loadSettings();
+  connectWs();
+  loadLogs();
+})();
+</script>
+
+</body>
+</html>
