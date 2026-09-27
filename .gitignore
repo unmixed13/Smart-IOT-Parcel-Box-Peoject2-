@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+venv/
+.venv/
+env/
+
+.env
+.env.backup
+*.db
+*.db-journal
+
+uploads/*
+!uploads/.gitkeep
+
+service.log
+*.log
