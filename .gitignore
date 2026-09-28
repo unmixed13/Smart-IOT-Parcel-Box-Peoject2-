@@ -14,3 +14,6 @@ uploads/*
 
 service.log
 *.log
+
+# Firmware configs hold real WiFi/API secrets — commit only config.example.h
+firmware/**/config.h
