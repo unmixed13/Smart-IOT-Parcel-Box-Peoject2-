@@ -26,7 +26,7 @@ from app.database import close_db, init_db
 from app.exceptions import register_exception_handlers
 from app.mqtt_client import mqtt_bridge
 from app.rate_limit import RateLimitMiddleware
-from app.routers import hardware, qr, upload, ws
+from app.routers import hardware, upload, qr, ws, line_webhook
 from app.services.line_messaging import close_line_client
 
 logging.basicConfig(
@@ -105,6 +105,7 @@ app.include_router(hardware.router, prefix=settings.api_v1_prefix)
 app.include_router(upload.router, prefix=settings.api_v1_prefix)
 app.include_router(qr.router, prefix=settings.api_v1_prefix)
 app.include_router(ws.router)
+app.include_router(line_webhook.router)
 
 
 @app.get("/health", tags=["meta"])
