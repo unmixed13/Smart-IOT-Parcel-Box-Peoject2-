@@ -17,6 +17,14 @@ const msg = (t) => ($("msg").textContent = t);
 async function api(path, opts = {}) {
   const r = await fetch("/api/liff" + path, { ...opts, headers: { "Content-Type": "application/json",
     Authorization: "Bearer " + liff.getIDToken() } });
+  if (r.status === 401) {
+    // Stale/expired ID token (LIFF keeps it in the browser): sign in again once, automatically.
+    let tried = false;
+    try { tried = sessionStorage.getItem("liff_relogin") === "1"; sessionStorage.setItem("liff_relogin", "1"); } catch (e) {}
+    if (!tried) { liff.logout(); liff.login({ redirectUri: location.origin + "/liff" }); return new Promise(() => {}); }
+  } else {
+    try { sessionStorage.removeItem("liff_relogin"); } catch (e) {}
+  }
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.status);
   return r.json();
 }

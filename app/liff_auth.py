@@ -1,8 +1,12 @@
 """Verifies the LINE ID token sent by the LIFF page and returns the user's LINE userId."""
+import logging
+
 import httpx
 from fastapi import Header, HTTPException, status
 
 from app.config import settings
+
+logger = logging.getLogger("parcel_box.liff_auth")
 
 
 async def current_line_user(authorization: str = Header(default="")) -> str:
@@ -18,5 +22,7 @@ async def current_line_user(authorization: str = Header(default="")) -> str:
     except httpx.RequestError:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Could not reach LINE to verify the token")
     if resp.status_code != 200 or not resp.json().get("sub"):
+        # LINE says why (e.g. "IdToken expired", "client_id does not match"); the token itself is never logged.
+        logger.warning("LINE ID token rejected: %s %s", resp.status_code, resp.text[:200])
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid LINE ID token")
     return resp.json()["sub"]
