@@ -18,9 +18,9 @@ from contextlib import asynccontextmanager
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
@@ -129,6 +129,32 @@ async def health_check():
 # browser page and the FastAPI backend share one origin — no CORS
 # configuration needed for it to call /api/* or open /ws/dashboard.
 _DASHBOARD_FILE = Path(__file__).resolve().parent.parent / "dashboard.html"
+
+
+def _is_local_request(request: Request) -> bool:
+    """True only for a browser on this very machine, not for traffic relayed by a
+    tunnel/proxy (Tailscale Funnel also connects from 127.0.0.1, but adds forwarding
+    headers and the public hostname in Host, which we reject)."""
+    if not request.client or request.client.host not in ("127.0.0.1", "::1"):
+        return False
+    h = request.headers
+    if any(k.startswith(("x-forwarded-", "tailscale-", "cf-")) or k in ("forwarded", "via") for k in h.keys()):
+        return False
+    host = h.get("host", "").lower()
+    host = host[1:host.index("]")] if host.startswith("[") else host.split(":")[0]
+    return host in ("localhost", "127.0.0.1", "::1")
+
+
+@app.get("/dashboard-config", tags=["meta"], include_in_schema=False)
+async def dashboard_config(request: Request):
+    """Lets the dashboard opened ON THIS MACHINE connect without typing keys.
+    Anyone coming through the public tunnel gets 404 and must enter them by hand."""
+    if not _is_local_request(request):
+        raise HTTPException(status_code=404)
+    return JSONResponse(
+        {"api_key": settings.hardware_api_key, "dashboard_token": settings.dashboard_token},
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/dashboard", tags=["meta"], include_in_schema=False)

@@ -157,3 +157,22 @@ def test_missing_key_is_401_and_openapi_declares_scheme(c):
     assert c.post("/api/device/verify-qr", json={"qr_code": "x"}).status_code == 401
     assert c.get("/api/hardware/logs").status_code == 401
     assert "APIKeyHeader" in c.get("/openapi.json").json()["components"]["securitySchemes"]
+
+
+def test_dashboard_config_only_for_local_browser():
+    import asyncio
+    import httpx
+    from app.main import app
+
+    async def get(client_ip, **headers):
+        t = httpx.ASGITransport(app=app, client=(client_ip, 5555))
+        async with httpx.AsyncClient(transport=t, base_url="http://localhost:8888") as ac:
+            return await ac.get("/dashboard-config", headers=headers)
+
+    r = asyncio.run(get("127.0.0.1"))
+    assert r.status_code == 200 and r.json()["api_key"] == "admin-key"
+    # public tunnel: loopback source but public Host / forwarding headers / remote source
+    assert asyncio.run(get("127.0.0.1", Host="box.example.ts.net")).status_code == 404
+    assert asyncio.run(get("127.0.0.1", **{"X-Forwarded-For": "1.2.3.4"})).status_code == 404
+    assert asyncio.run(get("127.0.0.1", **{"Tailscale-Funnel-Request": "?1"})).status_code == 404
+    assert asyncio.run(get("203.0.113.9")).status_code == 404

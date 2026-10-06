@@ -609,9 +609,24 @@
   $('#unlock-btn').addEventListener('click', sendUnlock);
   $('#refresh-log-btn').addEventListener('click', loadLogs);
 
-  loadSettings();
-  connectWs();
-  loadLogs();
+  // Opened on the server machine itself? Then the server hands us the keys (404 elsewhere).
+  async function autoConfigure() {
+    try {
+      const r = await fetch('/dashboard-config', { cache: 'no-store' });
+      if (!r.ok) return;
+      const c = await r.json();
+      localStorage.setItem('pb_base', window.location.origin);
+      localStorage.setItem('pb_key', c.api_key || '');
+      localStorage.setItem('pb_token', c.dashboard_token || '');
+    } catch (e) { /* not available: keep manual entry */ }
+  }
+
+  (async () => {
+    await autoConfigure();
+    loadSettings();
+    connectWs();
+    loadLogs();
+  })();
 })();
 </script>
 
