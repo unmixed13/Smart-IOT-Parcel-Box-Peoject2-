@@ -11,12 +11,13 @@ from app.database import get_db
 from app.models import Device
 from app.mqtt_client import mqtt_bridge
 from app.schemas import (
-    DeviceEventRequest, DeviceEventResponse, PendingCapture, QRVerifyRequest, QRVerifyResponse,
+    DeviceEventRequest, DeviceEventResponse, HeartbeatRequest, PendingCapture, QRVerifyRequest, QRVerifyResponse,
 )
 from app.security import authenticate_device
 from app.services import qr_service
 from app.services.sweeper import dispatch
 from app.timeutil import as_utc, utcnow
+from app.websocket_manager import manager
 
 logger = logging.getLogger("parcel_box.device")
 
@@ -52,3 +53,16 @@ async def pending_capture(device: Device = Depends(authenticate_device), db: Asy
         return PendingCapture(pending=False)
     left = int((as_utc(ev.image_deadline) - utcnow()).total_seconds())
     return PendingCapture(pending=True, event_id=ev.id, seconds_left=max(left, 0))
+
+
+@router.post("/heartbeat")
+async def heartbeat(body: HeartbeatRequest, device: Device = Depends(authenticate_device)):
+    """Periodic status from a board; shown as the device's online/door state on the dashboard (not stored)."""
+    payload = body.model_dump()
+    await manager.broadcast({
+        "source": "mqtt",  # same shape the dashboard already renders for device status
+        "topic": f"parcelbox/{device.device_id}/status",
+        "device_id": device.device_id,
+        "payload": payload,
+    })
+    return {"ok": True}

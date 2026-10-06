@@ -52,9 +52,10 @@ Use the **Authorize** button in `/docs` — all secured routes declare the key.
 | Auth | Method & path | Purpose |
 |---|---|---|
 | device key | `POST /api/device/verify-qr` `{qr_code}` | scan → unlock decision |
-| device key | `POST /api/device/event` `{type,event_id?}` | door/lock/manual events |
+| device key | `POST /api/device/event` `{type,event_id?}` | `door_opened`, `unlock_timeout`, `locked`, `door_ajar`, `manual_unlock`, `tamper` |
 | device key | `GET /api/device/pending-capture` | camera: is a photo wanted? |
-| device key | `POST /api/upload-image` | camera photo |
+| device key | `POST /api/upload-image` (multipart) / `POST /api/upload-image/raw?event_id=` (raw JPEG, used by the ESP32-CAM) | camera photo |
+| device key | `POST /api/device/heartbeat` | board status for the dashboard |
 | LIFF ID token | `GET /api/liff/me`, `GET/POST /api/liff/qr` | owner's boxes / QR codes |
 | admin key | `/api/admin/devices`, `/api/admin/bindings` | provisioning |
 | admin key | `POST /api/hardware/unlock`, `GET /api/hardware/logs` | operator |
@@ -66,3 +67,4 @@ Use the **Authorize** button in `/docs` — all secured routes declare the key.
 - MQTT is an optional extra unlock path; the HTTP reply is authoritative.
 - Tests: `pip install -r requirements-dev.txt && pytest`.
 - Never commit `.env`, `*.db` or logs (see `.gitignore`).
+- Firmware for both boards lives in `firmware/` (see `firmware/README.md`).

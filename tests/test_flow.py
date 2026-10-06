@@ -52,7 +52,8 @@ def test_happy_path_with_photo(c, box):
     r = scan(c, box, qr["code"]).json()
     assert r["granted"] and r["event_id"] == qr["event_id"] and r["unlock_seconds"] == 10
     assert event(c, box, "door_opened", qr["event_id"]).json()["status"] == "used"
-    assert scan(c, box, qr["code"]).json() == {"granted": False, "reason": "already_used", "event_id": None, "unlock_seconds": None}
+    denied = scan(c, box, qr["code"]).json()
+    assert denied["granted"] is False and denied["reason"] == "already_used" and denied["event_id"] is None
     assert event(c, box, "locked", qr["event_id"]).json()["accepted"]
 
     cap = c.get("/api/device/pending-capture", headers=box["cam"]).json()
@@ -176,3 +177,25 @@ def test_dashboard_config_only_for_local_browser():
     assert asyncio.run(get("127.0.0.1", **{"X-Forwarded-For": "1.2.3.4"})).status_code == 404
     assert asyncio.run(get("127.0.0.1", **{"Tailscale-Funnel-Request": "?1"})).status_code == 404
     assert asyncio.run(get("203.0.113.9")).status_code == 404
+
+
+def test_firmware_contract_heartbeat_tamper_raw_upload(c, box):
+    # verify reply carries the alert time for the ESP32 buzzer
+    qr = make_qr(c)
+    r = scan(c, box, qr["code"]).json()
+    assert r["door_open_alert_seconds"] == 60 and r["unlock_seconds"] == 10
+    # heartbeat (free-form) and tamper (no event_id)
+    assert c.post("/api/device/heartbeat", json={"door": "closed", "lock": "locked", "rssi": -60}, headers=box["esp"]).json() == {"ok": True}
+    assert c.post("/api/device/heartbeat", json={}, headers={"X-API-Key": "bad"}).status_code == 401
+    assert event(c, box, "tamper").json()["accepted"]
+    assert any("tampering" in m["text"] and m["to"] == box["user"] for m in sent)
+    # raw JPEG upload exactly as the ESP32-CAM sends it, matched via ?event_id=
+    event(c, box, "door_opened", qr["event_id"]); event(c, box, "locked", qr["event_id"])
+    jpg = b"\xff\xd8\xff\xe0" + b"1" * 5000
+    up = c.post(f"/api/upload-image/raw?event_id={qr['event_id']}", content=jpg,
+                headers={**box["cam"], "Content-Type": "image/jpeg"})
+    assert up.status_code == 201 and up.json()["event_id"] == qr["event_id"] and up.json()["size_bytes"] == len(jpg)
+    assert any("delivered" in m["text"] and m["image"] for m in sent)
+    # bad content type / signature are refused
+    assert c.post("/api/upload-image/raw", content=jpg, headers={**box["cam"], "Content-Type": "text/plain"}).status_code == 415
+    assert c.post("/api/upload-image/raw", content=b"notanimage" * 10, headers={**box["cam"], "Content-Type": "image/jpeg"}).status_code == 415

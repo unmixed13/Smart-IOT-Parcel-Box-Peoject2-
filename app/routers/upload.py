@@ -1,6 +1,10 @@
 """
 Image upload from the ESP32-CAM.
 
+Two equivalent entry points:
+  POST /api/upload-image          multipart/form-data  (`file`, optional `event_id`)  - browsers, Swagger
+  POST /api/upload-image/raw      raw image/jpeg|png body, `?event_id=` query          - ESP32-CAM firmware
+
 The image is matched to the delivery (Event-ID) that is waiting for a photo;
 on a match the owner gets a LINE message with the image. Without a waiting
 delivery the image is only stored and logged.
@@ -11,10 +15,11 @@ size cap enforced while streaming.
 """
 import logging
 import uuid
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 import aiofiles
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -25,7 +30,6 @@ from app.schemas import ImageUploadResponse
 from app.security import authenticate_device
 from app.services import qr_service
 from app.services.sweeper import dispatch
-from app.websocket_manager import manager
 
 logger = logging.getLogger("parcel_box.upload")
 
@@ -42,42 +46,45 @@ def _detect_extension(header: bytes) -> str | None:
     return None
 
 
-@router.post("", response_model=ImageUploadResponse, status_code=201)
-async def upload_image(
-    event_id: uuid.UUID | None = Form(default=None),
-    file: UploadFile = File(...),
-    device: Device = Depends(authenticate_device),
-    db: AsyncSession = Depends(get_db),
-):
-    """multipart/form-data: `file` (JPEG/PNG) and optional `event_id` from /device/pending-capture."""
-    if file.content_type not in _ALLOWED_CONTENT_TYPES:
-        raise UnsupportedFileTypeError(f"Content-Type '{file.content_type}' is not an accepted image type")
-
-    header = await file.read(16)
-    ext = _detect_extension(header)
+async def _store(device: Device, chunks: AsyncIterator[bytes]) -> tuple[Path, int]:
+    """Validate the signature and stream the image to disk under the size cap."""
+    first = b""
+    pending: list[bytes] = []
+    async for chunk in chunks:
+        pending.append(chunk)
+        first += chunk
+        if len(first) >= 16:
+            break
+    ext = _detect_extension(first[:16])
     if ext is None:
         raise UnsupportedFileTypeError("File signature does not match a supported image format")
 
-    device_dir: Path = settings.upload_path / "vision_captures" / device.device_id
+    device_dir = settings.upload_path / "vision_captures" / device.device_id
     device_dir.mkdir(parents=True, exist_ok=True)
     destination = device_dir / f"{uuid.uuid4().hex}.{ext}"
 
     max_size = settings.max_upload_size_bytes
-    bytes_written = len(header)
+    written = 0
     try:
         async with aiofiles.open(destination, "wb") as out_file:
-            await out_file.write(header)
-            while chunk := await file.read(1024 * 64):
-                bytes_written += len(chunk)
-                if bytes_written > max_size:
+            for chunk in pending:
+                written += len(chunk)
+                await out_file.write(chunk)
+            async for chunk in chunks:
+                written += len(chunk)
+                if written > max_size:
                     raise FileTooLargeError(f"Image exceeds max size of {settings.max_upload_size_mb} MB")
                 await out_file.write(chunk)
+        if written > max_size:
+            raise FileTooLargeError(f"Image exceeds max size of {settings.max_upload_size_mb} MB")
     except FileTooLargeError:
         destination.unlink(missing_ok=True)
         raise
-    finally:
-        await file.close()
+    return destination, written
 
+
+async def _finish(db: AsyncSession, device: Device, event_id: uuid.UUID | None,
+                  destination: Path, size: int) -> ImageUploadResponse:
     outcome = qr_service.Outcome()
     event = await qr_service.find_awaiting_capture(db, device.box, event_id, lock=True)
     notes = "Image captured and stored"
@@ -99,9 +106,45 @@ async def upload_image(
         "log_id": str(log.id), "event_id": str(event.id) if event else None,
     })
     await dispatch(outcome)
-    logger.info("Stored image %s (%d bytes) for device %s", destination, bytes_written, device.device_id)
-
+    logger.info("Stored image %s (%d bytes) for device %s", destination, size, device.device_id)
     return ImageUploadResponse(
-        file_path=str(destination), size_bytes=bytes_written, device_id=device.device_id,
+        file_path=str(destination), size_bytes=size, device_id=device.device_id,
         log_id=log.id, event_id=event.id if event else None,
     )
+
+
+@router.post("", response_model=ImageUploadResponse, status_code=201)
+async def upload_image(
+    event_id: uuid.UUID | None = Form(default=None),
+    file: UploadFile = File(...),
+    device: Device = Depends(authenticate_device),
+    db: AsyncSession = Depends(get_db),
+):
+    """multipart/form-data: `file` (JPEG/PNG) and optional `event_id` from /device/pending-capture."""
+    if file.content_type not in _ALLOWED_CONTENT_TYPES:
+        raise UnsupportedFileTypeError(f"Content-Type '{file.content_type}' is not an accepted image type")
+
+    async def chunks() -> AsyncIterator[bytes]:
+        while data := await file.read(1024 * 64):
+            yield data
+
+    try:
+        destination, size = await _store(device, chunks())
+    finally:
+        await file.close()
+    return await _finish(db, device, event_id, destination, size)
+
+
+@router.post("/raw", response_model=ImageUploadResponse, status_code=201)
+async def upload_image_raw(
+    request: Request,
+    event_id: uuid.UUID | None = None,
+    device: Device = Depends(authenticate_device),
+    db: AsyncSession = Depends(get_db),
+):
+    """Raw JPEG/PNG request body (Content-Type image/jpeg or image/png); `?event_id=` optional. For the ESP32-CAM."""
+    ctype = request.headers.get("content-type", "").split(";")[0].strip().lower()
+    if ctype not in _ALLOWED_CONTENT_TYPES:
+        raise UnsupportedFileTypeError(f"Content-Type '{ctype}' is not an accepted image type")
+    destination, size = await _store(device, request.stream())
+    return await _finish(db, device, event_id, destination, size)

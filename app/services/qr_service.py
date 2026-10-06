@@ -131,7 +131,8 @@ async def verify_scan(db: AsyncSession, device: Device, raw_code: str) -> tuple[
     out.broadcast.append({"event": "qr_verified", "device_id": device.device_id, "granted": True,
                           "reason": "access_granted", "event_id": str(event.id)})
     return QRVerifyResponse(granted=True, reason="access_granted", event_id=event.id,
-                            unlock_seconds=settings.unlock_seconds), out
+                            unlock_seconds=settings.unlock_seconds,
+                            door_open_alert_seconds=settings.door_ajar_seconds), out
 
 
 # --- Device events (door / lock / manual) ---
@@ -147,6 +148,15 @@ async def apply_device_event(db: AsyncSession, device: Device, req: DeviceEventR
         for u in owners or [None]:
             out.notices.append(Notice(u, f"🔑 Box {device.box} was opened with the manual override (no photo)."))
         out.broadcast.append({"event": "manual_unlock", "device_id": device.device_id})
+        return DeviceEventResponse(accepted=True, detail="logged"), out
+
+    if req.type == "tamper":
+        _log(db, device.device_id, EventType.TAMPER, AccessResult.ERROR, "door opened while locked")
+        await db.commit()
+        owners = [u for (u,) in (await db.execute(select(BoxBinding.line_user_id).where(BoxBinding.box_id == device.box))).all()]
+        for u in owners or [None]:
+            out.notices.append(Notice(u, f"🚨 Box {device.box}: the door was opened while locked (possible tampering)."))
+        out.broadcast.append({"event": "tamper", "device_id": device.device_id})
         return DeviceEventResponse(accepted=True, detail="logged"), out
 
     if req.event_id is None:

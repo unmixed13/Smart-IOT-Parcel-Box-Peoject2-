@@ -1,0 +1,2 @@
+# Real Wi-Fi password and per-device API key live in config.h - never commit it.
+**/config.h

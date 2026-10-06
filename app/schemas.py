@@ -68,10 +68,11 @@ class QRVerifyResponse(BaseModel):
     reason: str
     event_id: uuid.UUID | None = None
     unlock_seconds: int | None = None
+    door_open_alert_seconds: int | None = None  # Tajar, so the ESP32 buzzer matches the server's LINE alert
 
 
 class DeviceEventRequest(BaseModel):
-    type: Literal["door_opened", "unlock_timeout", "locked", "door_ajar", "manual_unlock"]
+    type: Literal["door_opened", "unlock_timeout", "locked", "door_ajar", "manual_unlock", "tamper"]
     event_id: uuid.UUID | None = None  # required for everything except manual_unlock
 
 
@@ -79,6 +80,11 @@ class DeviceEventResponse(BaseModel):
     accepted: bool
     status: QRStatus | None = None
     detail: str = ""
+
+
+class HeartbeatRequest(BaseModel):
+    """Free-form status from the board (door, lock, rssi, uptime_s, free_heap, fw, ...)."""
+    model_config = ConfigDict(extra="allow")
 
 
 class PendingCapture(BaseModel):
