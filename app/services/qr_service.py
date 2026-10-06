@@ -176,9 +176,11 @@ async def apply_device_event(db: AsyncSession, device: Device, req: DeviceEventR
         if event.status == QRStatus.UNLOCKING:
             event.status, event.used_at, event.door_open_since = QRStatus.USED, now, now
             _log(db, device.device_id, EventType.DOOR_OPEN, AccessResult.GRANTED, f"door opened, event {event.id}", event.code)
+            _door_notice(out, event, f"🚪 Box {event.box_id}: the door was opened.")
         elif event.status == QRStatus.USED and event.door_open_since is None and event.lock_reported_at is None:
             event.door_open_since = now  # code was burned by Fail-Secure but the door really opened
             _log(db, device.device_id, EventType.DOOR_OPEN, AccessResult.GRANTED, f"door opened after fail-secure, event {event.id}", event.code)
+            _door_notice(out, event, f"🚪 Box {event.box_id}: the door was opened.")
         elif event.status != QRStatus.USED:
             return await done(False, "not_unlocking")
         await db.commit()
@@ -201,6 +203,7 @@ async def apply_device_event(db: AsyncSession, device: Device, req: DeviceEventR
             event.image_deadline = now + timedelta(seconds=settings.image_wait_seconds)
             event.door_open_since = None
             _log(db, device.device_id, EventType.LOCKED, AccessResult.GRANTED, f"door closed and locked, event {event.id}", event.code)
+            _door_notice(out, event, f"🔒 Box {event.box_id}: the door was closed and locked.")
             await db.commit()
             out.broadcast.append({"event": "locked", "device_id": device.device_id, "event_id": str(event.id)})
         return await done(True)
@@ -213,6 +216,11 @@ async def apply_device_event(db: AsyncSession, device: Device, req: DeviceEventR
         out.notices.append(Notice(event.line_user_id, _ajar_text(device.box)))
         return await done(True)
     return await done(False, "already_alerted_or_closed")
+
+
+def _door_notice(out: Outcome, event: QREvent, text: str) -> None:
+    if settings.notify_door_events:
+        out.notices.append(Notice(event.line_user_id, text))
 
 
 def _ajar_text(box_id: str) -> str:

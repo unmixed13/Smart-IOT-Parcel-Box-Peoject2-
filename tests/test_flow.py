@@ -199,3 +199,21 @@ def test_firmware_contract_heartbeat_tamper_raw_upload(c, box):
     # bad content type / signature are refused
     assert c.post("/api/upload-image/raw", content=jpg, headers={**box["cam"], "Content-Type": "text/plain"}).status_code == 415
     assert c.post("/api/upload-image/raw", content=b"notanimage" * 10, headers={**box["cam"], "Content-Type": "image/jpeg"}).status_code == 415
+
+
+def test_line_messages_for_door_open_and_close(c, box):
+    qr = make_qr(c)
+    scan(c, box, qr["code"])
+    event(c, box, "door_opened", qr["event_id"])
+    event(c, box, "door_opened", qr["event_id"])          # repeated report: no second message
+    assert [m["text"] for m in sent if "was opened" in m["text"]] == [f"🚪 Box {box['id']}: the door was opened."]
+    event(c, box, "locked", qr["event_id"])
+    event(c, box, "locked", qr["event_id"])
+    closed = [m for m in sent if "closed and locked" in m["text"]]
+    assert len(closed) == 1 and closed[0]["to"] == box["user"] and closed[0]["image"] is None
+    up = c.post("/api/upload-image/raw?event_id=" + qr["event_id"], content=b"\xff\xd8\xff" + b"1" * 100,
+                headers={**box["cam"], "Content-Type": "image/jpeg"})
+    assert up.status_code == 201
+    texts = [m["text"] for m in sent]
+    assert texts.index(next(t for t in texts if "was opened" in t)) < texts.index(next(t for t in texts if "closed and locked" in t)) \
+        < texts.index(next(t for t in texts if "delivered" in t))
