@@ -1,175 +1,68 @@
-# Smart IoT Parcel Box — Centralized Web Server
+# Smart IoT Parcel Box — Backend
 
-Production-grade, fully async FastAPI backend for an ESP32-based smart parcel
-box with a GM66 QR scanner + solenoid lock, and a LILYGO ESP32-S3 vision node.
+FastAPI + MySQL + LINE Messaging API backend for the thesis "Design and
+Development of a Smart IoT Parcel Box" (ESP32 + GM66 + solenoid, ESP32-CAM).
 
-## 1. Architecture
+## Flow (thesis §3.2.1)
 
-```
-smart_iot_parcel_box/
-├── app/
-│   ├── main.py              # FastAPI app, lifespan (DB + MQTT), CORS, routers
-│   ├── config.py             # pydantic-settings — single source of config truth
-│   ├── database.py           # Async SQLAlchemy engine/session/init
-│   ├── models.py              # ORM: ParcelWhitelist, AccessLog
-│   ├── schemas.py             # Pydantic request/response contracts
-│   ├── security.py            # API key dependency (X-API-Key header)
-│   ├── exceptions.py          # Domain exceptions + centralized handlers
-│   ├── mqtt_client.py         # aiomqtt bridge, wired into app lifespan
-│   ├── websocket_manager.py   # Dashboard broadcast connection manager
-│   ├── routers/
-│   │   ├── hardware.py        # POST /hardware/unlock, GET /hardware/logs
-│   │   ├── upload.py          # POST /upload-image (multipart, ESP32-S3)
-│   │   ├── qr.py               # POST /verify-qr (ESP32 main controller)
-│   │   └── ws.py                # WS /ws/dashboard (live event stream)
-│   └── services/
-│       ├── qr_service.py      # QR validation business logic
-│       └── line_notify.py     # httpx-based LINE Notify client
-├── uploads/                    # Local image storage (gitignored in practice)
-├── requirements.txt
-├── .env.example
-└── README.md
-```
+1. **Create QR** — the owner opens the LIFF page (`/liff`); the server creates a
+   random-UUID QR (valid 24 h, error-correction M) in state `pending`.
+2. **Scan** — ESP32 `POST /api/device/verify-qr`. Valid → `unlocking`, reply has
+   `event_id` and `unlock_seconds` (10). Re-scan of the same code returns the same
+   `event_id` and restarts the timer. Invalid/expired/used → `granted:false`
+   (buzzer on the ESP32, alert to the admin on LINE).
+3. **Door events** — ESP32 `POST /api/device/event` with `type`:
+   `door_opened` (unlocking→used), `unlock_timeout` (unlocking→pending; rejected
+   if already used), `locked` (door closed + locked → starts the 30 s photo wait),
+   `door_ajar`, `manual_unlock` (button; logged + LINE, no photo).
+4. **Photo** — ESP32-CAM polls `GET /api/device/pending-capture`, then
+   `POST /api/upload-image` (multipart: `file`, `event_id`). The owner gets a LINE
+   message with the photo (public URL via Tailscale Funnel → `PUBLIC_BASE_URL`);
+   after 30 s without a photo the message is sent without it.
+5. **Timers** (background sweeper, 1 s): `unlocking` > 15 s with no report → `used`
+   (fail-secure); `pending` > 24 h → `expired`; door open > 60 s → buzzer/LINE once.
 
-**Why this shape:** routers stay thin (HTTP concerns only), business logic
-lives in `services/`, and cross-cutting infra (DB, MQTT, WebSocket manager,
-security, error handling) each get their own module so nothing is tangled.
-This is the same separation you'd use for a much larger fleet of devices —
-it scales down cleanly to one box and scales up cleanly to thousands.
+States: `pending → unlocking → used`, `pending → expired`, `unlocking → pending`.
 
-### Request / event flow
-
-```
-ESP32 (GM66 scan)  --HTTP POST /api/verify-qr-->  FastAPI  --SQL-->  access_logs
-                                                        |
-                                                        +--MQTT publish--> parcelbox/{id}/command (unlock)
-                                                        |
-                                                        +--WS broadcast--> Dashboard
-
-ESP32-S3 (camera)  --HTTP POST /api/upload-image-->  FastAPI --file-->  uploads/
-                                                        |
-                                                        +--LINE Notify (async, best-effort)
-                                                        +--WS broadcast--> Dashboard
-
-ESP32 (sensors)  --MQTT publish--> parcelbox/{id}/status|event  -->  MQTTBridge
-                                                        |
-                                                        +--WS broadcast--> Dashboard
-```
-
-Everything is `async`/non-blocking end to end: the DB driver (`aiosqlite` /
-`asyncpg`), the MQTT client (`aiomqtt`), the HTTP client (`httpx`), and file
-I/O (`aiofiles`) are all async, so one worker process comfortably handles
-many concurrent devices and dashboard clients without thread pools.
-
-## 2. Setup
+## Setup
 
 ```bash
-python -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
+python -m venv venv && source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-
-cp .env.example .env
-# edit .env: set HARDWARE_API_KEY, MQTT_HOST, LINE_NOTIFY_TOKEN, etc.
-
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+cp .env.example .env                              # fill in the values
+python run_server.py                              # Windows-safe launcher (NSSM)
 ```
+Docs: `/docs` · Health: `/health` · Dashboard: `/dashboard` · LIFF page: `/liff`
+Tables are created on startup (retries until MySQL is reachable). Old
+`parcels_whitelist` is no longer used and can be dropped.
 
-Interactive API docs: `http://localhost:8000/docs`
-Health check: `GET /health` (no auth)
+### First-time provisioning (admin key in `X-API-Key`)
 
-By default `DATABASE_URL` points at local SQLite (`aiosqlite`) for zero-setup
-development. Switch to `postgresql+asyncpg://...` for production — the code
-is driver-agnostic since it only uses SQLAlchemy's async API.
-
-### Production notes
-- Replace `init_db()` (which calls `create_all`) with Alembic migrations
-  (`alembic init migrations`) before your schema needs to evolve safely.
-- Run behind a reverse proxy (nginx/Caddy) terminating TLS; `wss://` for the
-  dashboard WebSocket, `https://` for REST.
-- Run with multiple Uvicorn/Gunicorn workers **only if** you move the MQTT
-  bridge and WebSocket manager to a shared broker-backed pub/sub (e.g. Redis)
-  — as written, the MQTT connection and WS client set are per-process.
-- Rotate `HARDWARE_API_KEY` per device by moving from a single shared secret
-  to a `device_api_keys` table validated in `security.py` — the dependency
-  interface (`Depends(verify_hardware_api_key)`) doesn't need to change.
-
-## 3. Database Layer
-
-Two tables, both async SQLAlchemy 2.0 ORM models (`app/models.py`):
-
-- **`parcels_whitelist`** — authorized QR codes/couriers. Indexed on
-  `(qr_code, is_active)` for the hot-path lookup during verification.
-  Supports soft-deactivation (`is_active`) and expiry (`expires_at`).
-- **`access_logs`** — append-only audit trail of every scan, image capture,
-  unlock command, and hardware event. Indexed on `(device_id, created_at)`
-  for the dashboard's per-device timeline, and on `event_type` for filtering.
-  Foreign-keyed to the whitelist entry that granted access (nullable, so
-  denied/unmatched attempts are still logged).
-
-## 4. Real-Time Communication
-
-- **MQTT** (`app/mqtt_client.py`): a single background task, started in
-  FastAPI's `lifespan`, subscribes to `parcelbox/+/status` and
-  `parcelbox/+/event`, auto-reconnects with exponential backoff, and exposes
-  `publish_command(device_id, payload)` for the REST layer to send unlock
-  commands. Inbound messages are relayed live to the dashboard.
-- **WebSocket** (`app/routers/ws.py` + `websocket_manager.py`): dashboard
-  clients connect to `ws://.../ws/dashboard` and receive every MQTT event,
-  QR verification result, image capture, and manual unlock as JSON, in
-  real time. Dead connections are pruned automatically on send failure.
-
-## 5. REST API Summary
-
-All `/api/*` endpoints below require header `X-API-Key: <HARDWARE_API_KEY>`.
-
-| Method | Path                    | Purpose                                      |
-|--------|-------------------------|-----------------------------------------------|
-| POST   | `/api/verify-qr`        | ESP32 sends scanned QR for validation        |
-| POST   | `/api/upload-image`     | ESP32-S3 uploads a captured image            |
-| POST   | `/api/hardware/unlock`  | Manually trigger unlock via MQTT             |
-| GET    | `/api/hardware/logs`    | Query recent access logs                     |
-| WS     | `/ws/dashboard`         | Live event stream (no API key — add session auth before public exposure) |
-| GET    | `/health`               | Liveness probe (no API key)                  |
-
-`POST /api/upload-image` validates both the declared `Content-Type` and the
-file's actual magic bytes, generates a server-side UUID filename (never
-trusts client-supplied names), and enforces `MAX_UPLOAD_SIZE_MB` mid-stream.
-
-## 6. Security
-
-- **API key auth** (`app/security.py`): `Depends(verify_hardware_api_key)`
-  on every hardware-facing router, using `hmac.compare_digest` for
-  constant-time comparison.
-- **Centralized error handling** (`app/exceptions.py`): domain errors
-  (`QRCodeExpiredError`, `FileTooLargeError`, `MQTTPublishError`, ...) map to
-  correct HTTP status codes; a catch-all handler ensures no stack trace or
-  internal detail ever leaks to a client. Every error response has the
-  consistent shape `{"error": "<code>", "detail": "<message>"}`.
-- **File upload safety**: magic-byte sniffing, server-generated filenames,
-  per-device subdirectories, streamed writes with a hard size cap.
-
-## 7. Firmware ↔ Server Contract (quick reference)
-
-**ESP32 main controller**, after a GM66 scan:
+```bash
+# one device = one key (shown once). The camera shares the box via box_id.
+POST /api/admin/devices   {"device_id":"box-01"}
+POST /api/admin/devices   {"device_id":"box-01-cam","box_id":"box-01"}
+# link an owner (userId appears in the log when they message the bot)
+POST /api/admin/bindings  {"line_user_id":"U…","box_id":"box-01"}
 ```
-POST /api/verify-qr
-X-API-Key: <key>
-{ "device_id": "box-01", "qr_code": "<scanned payload>" }
-```
-On `granted: true`, the server also publishes an MQTT unlock command to
-`parcelbox/box-01/command` — the ESP32 can act on either the HTTP response
-or the MQTT message, whichever arrives first, for lower latency.
+Use the **Authorize** button in `/docs` — all secured routes declare the key.
 
-**ESP32 main controller**, periodic/event MQTT publish:
-```
-Topic: parcelbox/box-01/status   (or .../event)
-Payload: { "device_id": "box-01", "battery": 87, "door": "closed" }
-```
+## API
 
-**LILYGO ESP32-S3 vision node**, after capturing an image:
-```
-POST /api/upload-image   (multipart/form-data)
-X-API-Key: <key>
-device_id=box-01
-file=<jpeg/png bytes>
-```
+| Auth | Method & path | Purpose |
+|---|---|---|
+| device key | `POST /api/device/verify-qr` `{qr_code}` | scan → unlock decision |
+| device key | `POST /api/device/event` `{type,event_id?}` | door/lock/manual events |
+| device key | `GET /api/device/pending-capture` | camera: is a photo wanted? |
+| device key | `POST /api/upload-image` | camera photo |
+| LIFF ID token | `GET /api/liff/me`, `GET/POST /api/liff/qr` | owner's boxes / QR codes |
+| admin key | `/api/admin/devices`, `/api/admin/bindings` | provisioning |
+| admin key | `POST /api/hardware/unlock`, `GET /api/hardware/logs` | operator |
+| signature | `POST /line-webhook` | `X-Line-Signature` verified with the channel secret |
+| token | `WS /ws/dashboard?token=` | live feed |
+
+## Notes
+- Run a single worker: the sweeper, MQTT bridge and WebSocket set are per-process.
+- MQTT is an optional extra unlock path; the HTTP reply is authoritative.
+- Tests: `pip install -r requirements-dev.txt && pytest`.
+- Never commit `.env`, `*.db` or logs (see `.gitignore`).

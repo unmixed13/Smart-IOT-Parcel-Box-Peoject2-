@@ -466,7 +466,7 @@
     line.innerHTML =
       '<span class="ts">' + fmtTime(new Date()) + '</span>' +
       '<span class="badge ' + info.badge + '">' + info.label + '</span>' +
-      '<span class="dev">' + (event.device_id || '—') + '</span>' +
+      '<span class="dev">' + escapeHtml(String(event.device_id || '—')) + '</span>' +
       '<span class="detail">' + escapeHtml(info.detail) + '</span>';
     feed.prepend(line);
 
