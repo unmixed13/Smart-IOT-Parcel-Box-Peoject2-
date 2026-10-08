@@ -7,6 +7,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <HTTPClient.h>
+#include <Preferences.h>
 #include <WiFiClientSecure.h>
 
 #define WIFI_SSID     ""      // leave "" to skip Wi-Fi
@@ -43,6 +44,7 @@
 WebServer web(80);
 bool flashOn = false;
 int vflipNow = CAM_VFLIP, hmirrorNow = CAM_HMIRROR;
+Preferences prefs;   // flip settings are stored in the chip itself (namespace "cam") and read by parcel_box_vision_cam too
 
 bool initCamera() {
   camera_config_t c = {};
@@ -65,8 +67,12 @@ bool initCamera() {
   }
   esp_err_t e = esp_camera_init(&c);
   if (e != ESP_OK) { Serial.printf("Camera init FAILED 0x%x\n", e); return false; }
+  prefs.begin("cam", true);
+  vflipNow = prefs.getInt("vflip", CAM_VFLIP); hmirrorNow = prefs.getInt("hmirror", CAM_HMIRROR);
+  prefs.end();
   sensor_t* sn = esp_camera_sensor_get();
-  if (sn) { sn->set_vflip(sn, CAM_VFLIP); sn->set_hmirror(sn, CAM_HMIRROR); }
+  if (sn) { sn->set_vflip(sn, vflipNow); sn->set_hmirror(sn, hmirrorNow); }
+  Serial.printf("orientation: vflip=%d hmirror=%d\n", vflipNow, hmirrorNow);
   Serial.println("OV2640 ready");
   return true;
 }
@@ -138,7 +144,7 @@ void setup() {
       web.on("/", handleRoot); web.on("/photo", handlePhoto); web.begin();
     } else Serial.println("\nWi-Fi FAILED");
   }
-  Serial.println("Commands: p=photo  u=upload to server/LINE  v=flip up/down  m=mirror left/right  f=flash toggle  t=watch TRIG(GPIO13) 10s");
+  Serial.println("Commands: p=photo  u=upload to server/LINE  v=flip up/down  m=mirror left/right  s=SAVE flip permanently  f=flash toggle  t=watch TRIG(GPIO13) 10s");
 }
 
 void loop() {
@@ -152,6 +158,10 @@ void loop() {
     if (ch == 'v') vflipNow = !vflipNow; else hmirrorNow = !hmirrorNow;
     if (sn) { sn->set_vflip(sn, vflipNow); sn->set_hmirror(sn, hmirrorNow); }
     Serial.printf("vflip=%d hmirror=%d  (type u or open the web page to see it)\n", vflipNow, hmirrorNow);
+  }
+  else if (ch == 's') {
+    prefs.begin("cam", false); prefs.putInt("vflip", vflipNow); prefs.putInt("hmirror", hmirrorNow); prefs.end();
+    Serial.printf("SAVED permanently in this camera: vflip=%d hmirror=%d\n", vflipNow, hmirrorNow);
   }
   else if (ch == 'f') { flashOn = !flashOn; digitalWrite(FLASH_PIN, flashOn); Serial.println(flashOn ? "flash ON" : "flash OFF"); }
   else if (ch == 't') {

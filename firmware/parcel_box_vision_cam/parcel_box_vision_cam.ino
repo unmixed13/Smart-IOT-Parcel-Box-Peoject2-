@@ -23,6 +23,7 @@
   No extra libraries. Copy config.example.h to config.h first.
 */
 
+#include <Preferences.h>
 #include "esp_camera.h"
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -90,8 +91,11 @@ static bool initCamera() {
 #ifndef CAM_HMIRROR
 #define CAM_HMIRROR 0   // image mirrored left-right? set 1
 #endif
-    s->set_vflip(s, CAM_VFLIP);
-    s->set_hmirror(s, CAM_HMIRROR);
+    // Saved by camera_test.ino (command s) in the chip's own memory; falls back to the defaults above.
+    Preferences camPrefs; camPrefs.begin("cam", true);
+    s->set_vflip(s, camPrefs.getInt("vflip", CAM_VFLIP));
+    s->set_hmirror(s, camPrefs.getInt("hmirror", CAM_HMIRROR));
+    camPrefs.end();
   }
   Serial.println("[CAM] OV2640 ready");
   return true;
