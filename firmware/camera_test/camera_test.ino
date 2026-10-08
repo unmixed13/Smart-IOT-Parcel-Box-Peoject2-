@@ -1,13 +1,22 @@
 // ESP32-CAM standalone test - no server, no main board needed.
 // Board: "AI Thinker ESP32-CAM", Serial Monitor 115200.
 // Serial commands: p = take photo (print size)   f = flash on/off   t = watch GPIO13 (TRIG) level
+//   u = take photo and UPLOAD to the server (server pushes it to LINE)
 // If WIFI_SSID is filled, open http://<IP printed>/ in a browser to see a live photo.
 #include "esp_camera.h"
 #include <WiFi.h>
 #include <WebServer.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 
 #define WIFI_SSID     ""      // leave "" to skip Wi-Fi
 #define WIFI_PASSWORD ""
+
+// For command "u" (upload to server -> LINE). Same values as parcel_box_vision_cam/config.h
+#define SERVER_HOST   "192.168.1.50"   // PC running run_server.py (LAN IP), or your Funnel hostname with SERVER_HTTPS 1
+#define SERVER_PORT   8888
+#define SERVER_HTTPS  0                // 1 = https://SERVER_HOST (port ignored), e.g. laptop-xxx.tail92a680.ts.net
+#define DEVICE_API_KEY "paste-api_key-of-box-01-cam"
 
 #define PWDN_GPIO_NUM 32
 #define RESET_GPIO_NUM -1
@@ -72,6 +81,28 @@ void shoot() {
   esp_camera_fb_return(fb);
 }
 
+void uploadPhoto() {
+  if (WiFi.status() != WL_CONNECTED) { Serial.println("[FAIL] Wi-Fi not connected (fill WIFI_SSID)"); return; }
+  digitalWrite(FLASH_PIN, HIGH); delay(150);
+  camera_fb_t* fb = grab();
+  digitalWrite(FLASH_PIN, flashOn ? HIGH : LOW);
+  if (!fb) { Serial.println("[FAIL] no frame"); return; }
+  HTTPClient http;
+  WiFiClientSecure tls; WiFiClient plain;
+  String url;
+  if (SERVER_HTTPS) { tls.setInsecure(); url = String("https://") + SERVER_HOST + "/api/upload-image/raw?notify=1"; http.begin(tls, url); }
+  else { url = String("http://") + SERVER_HOST + ":" + SERVER_PORT + "/api/upload-image/raw?notify=1"; http.begin(plain, url); }
+  http.setTimeout(20000);
+  http.addHeader("Content-Type", "image/jpeg");
+  http.addHeader("X-API-Key", DEVICE_API_KEY);
+  Serial.printf("POST %s (%u bytes)\n", url.c_str(), (unsigned)fb->len);
+  int code = http.POST(fb->buf, fb->len);
+  esp_camera_fb_return(fb);
+  Serial.printf("HTTP %d  %s\n", code, code > 0 ? http.getString().c_str() : http.errorToString(code).c_str());
+  Serial.println(code == 201 ? "[OK] uploaded - check LINE + dashboard" : "[FAIL] see HTTP code (401=API key, -1=cannot reach server)");
+  http.end();
+}
+
 void handleRoot() {
   web.send(200, "text/html", "<meta name=viewport content='width=device-width'><h3>ESP32-CAM test</h3>"
                              "<img src='/photo' style='max-width:100%'><p><a href='/'>refresh</a></p>");
@@ -102,7 +133,7 @@ void setup() {
       web.on("/", handleRoot); web.on("/photo", handlePhoto); web.begin();
     } else Serial.println("\nWi-Fi FAILED");
   }
-  Serial.println("Commands: p=photo  f=flash toggle  t=watch TRIG(GPIO13) 10s");
+  Serial.println("Commands: p=photo  u=upload to server/LINE  f=flash toggle  t=watch TRIG(GPIO13) 10s");
 }
 
 void loop() {
@@ -110,6 +141,7 @@ void loop() {
   if (!Serial.available()) return;
   char ch = Serial.read();
   if (ch == 'p') shoot();
+  else if (ch == 'u') uploadPhoto();
   else if (ch == 'f') { flashOn = !flashOn; digitalWrite(FLASH_PIN, flashOn); Serial.println(flashOn ? "flash ON" : "flash OFF"); }
   else if (ch == 't') {
     Serial.println("watching GPIO13 for 10 s (pulse it from the main board)...");

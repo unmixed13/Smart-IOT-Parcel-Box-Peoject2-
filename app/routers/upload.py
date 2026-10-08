@@ -84,7 +84,7 @@ async def _store(device: Device, chunks: AsyncIterator[bytes]) -> tuple[Path, in
 
 
 async def _finish(db: AsyncSession, device: Device, event_id: uuid.UUID | None,
-                  destination: Path, size: int) -> ImageUploadResponse:
+                  destination: Path, size: int, notify: bool = False) -> ImageUploadResponse:
     outcome = qr_service.Outcome()
     event = await qr_service.find_awaiting_capture(db, device.box, event_id, lock=True)
     notes = "Image captured and stored"
@@ -93,6 +93,9 @@ async def _finish(db: AsyncSession, device: Device, event_id: uuid.UUID | None,
         event.notified = True
         notes = f"Delivery photo for event {event.id}"
         outcome.notices.append(qr_service.delivery_notice(event, str(destination)))
+    elif notify:
+        # Bench test: no delivery is waiting, so send the photo to the default LINE_USER_ID.
+        outcome.notices.append(qr_service.Notice(None, f"📷 Test photo from {device.device_id}", str(destination)))
     log = AccessLog(
         device_id=device.device_id, event_type=EventType.IMAGE_CAPTURE, result=AccessResult.GRANTED,
         image_path=str(destination), notes=notes,
@@ -139,12 +142,13 @@ async def upload_image(
 async def upload_image_raw(
     request: Request,
     event_id: uuid.UUID | None = None,
+    notify: bool = False,
     device: Device = Depends(authenticate_device),
     db: AsyncSession = Depends(get_db),
 ):
-    """Raw JPEG/PNG request body (Content-Type image/jpeg or image/png); `?event_id=` optional. For the ESP32-CAM."""
+    """Raw JPEG/PNG request body (Content-Type image/jpeg or image/png); `?event_id=` optional; `?notify=1` sends an unmatched (test) photo to LINE_USER_ID. For the ESP32-CAM."""
     ctype = request.headers.get("content-type", "").split(";")[0].strip().lower()
     if ctype not in _ALLOWED_CONTENT_TYPES:
         raise UnsupportedFileTypeError(f"Content-Type '{ctype}' is not an accepted image type")
     destination, size = await _store(device, request.stream())
-    return await _finish(db, device, event_id, destination, size)
+    return await _finish(db, device, event_id, destination, size, notify)
