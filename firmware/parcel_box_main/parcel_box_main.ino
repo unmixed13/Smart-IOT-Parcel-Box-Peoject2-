@@ -54,41 +54,18 @@
 #endif
 #define BUZZER_LEDC_CH 4   // only used with ESP32 Arduino core 2.x
 
-#define FW_VERSION "2.2.0"
+#define FW_VERSION "2.2.1"
 
 // ---------------------------------------------------------------------------
 // Hardware abstraction
 // ---------------------------------------------------------------------------
-#if BUZZER_PASSIVE
-static void buzzerTone(bool on) {
-  if (on) {
-#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
-    ledcAttach(PIN_BUZZ_SIG, BUZZER_FREQ_HZ, 8);
-    ledcWriteTone(PIN_BUZZ_SIG, BUZZER_FREQ_HZ);
-#else
-    ledcSetup(BUZZER_LEDC_CH, BUZZER_FREQ_HZ, 8);
-    ledcAttachPin(PIN_BUZZ_SIG, BUZZER_LEDC_CH);
-    ledcWriteTone(BUZZER_LEDC_CH, BUZZER_FREQ_HZ);
-#endif
-  } else {
-#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
-    ledcDetach(PIN_BUZZ_SIG);
-#else
-    ledcDetachPin(PIN_BUZZ_SIG);
-#endif
-    pinMode(PIN_BUZZ_SIG, OUTPUT);
-    digitalWrite(PIN_BUZZ_SIG, BUZZER_ACTIVE_LOW ? HIGH : LOW);   // idle level = silent
-  }
-}
-#endif
-
 class EspHal : public pb::Hal {
  public:
   uint32_t millis() override { return ::millis(); }
   void coil(bool on) override { digitalWrite(PIN_LOCK_SIG, on ? HIGH : LOW); }
   void buzzer(bool on) override {
 #if BUZZER_PASSIVE
-    buzzerTone(on);
+    passiveTone(on);
 #else
     digitalWrite(PIN_BUZZ_SIG, (on != (BUZZER_ACTIVE_LOW != 0)) ? HIGH : LOW);
 #endif
@@ -97,6 +74,32 @@ class EspHal : public pb::Hal {
   bool doorClosedRaw() override { return digitalRead(PIN_DOOR_SW) == LOW; }
   bool buttonPressedRaw() override { return digitalRead(PIN_UNLOCK_BTN_SIG) == LOW; }
   void log(const char *msg) override { Serial.printf("[%lu] %s\n", (unsigned long)::millis(), msg); }
+
+ private:
+  // Kept inside the class on purpose: the Arduino builder inserts prototypes of free functions
+  // above the first one it finds, which must stay below the struct definitions further down.
+#if BUZZER_PASSIVE
+  static void passiveTone(bool on) {
+    if (on) {
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+      ledcAttach(PIN_BUZZ_SIG, BUZZER_FREQ_HZ, 8);
+      ledcWriteTone(PIN_BUZZ_SIG, BUZZER_FREQ_HZ);
+#else
+      ledcSetup(BUZZER_LEDC_CH, BUZZER_FREQ_HZ, 8);
+      ledcAttachPin(PIN_BUZZ_SIG, BUZZER_LEDC_CH);
+      ledcWriteTone(BUZZER_LEDC_CH, BUZZER_FREQ_HZ);
+#endif
+    } else {
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+      ledcDetach(PIN_BUZZ_SIG);
+#else
+      ledcDetachPin(PIN_BUZZ_SIG);
+#endif
+      pinMode(PIN_BUZZ_SIG, OUTPUT);
+      digitalWrite(PIN_BUZZ_SIG, BUZZER_ACTIVE_LOW ? HIGH : LOW);   // idle level = silent
+    }
+  }
+#endif
 };
 
 // ---------------------------------------------------------------------------
