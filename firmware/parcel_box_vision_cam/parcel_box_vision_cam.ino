@@ -34,7 +34,13 @@
 #error "Copy config.example.h to config.h and edit it (Wi-Fi, server address, device API key)."
 #endif
 
-#define FW_VERSION "2.2.0"
+#define FW_VERSION "2.2.1"
+
+// Onboard red LED (GPIO33, active LOW). Blinks twice whenever a TRIG pulse arrives, so the wire can be
+// tested with no USB/Serial attached (the module sitting off its USB base, powered from 5 V).
+#ifndef STATUS_LED_PIN
+#define STATUS_LED_PIN 33
+#endif
 
 volatile bool triggerPending = false;
 static uint32_t lastTriggerMs = 0;
@@ -182,6 +188,13 @@ static void heartbeat() {
 }
 
 // ---------------------------------------------------------------------------
+static void blinkStatusLed(int times) {
+  for (int i = 0; i < times; i++) {
+    digitalWrite(STATUS_LED_PIN, LOW);  delay(90);    // LOW = on
+    digitalWrite(STATUS_LED_PIN, HIGH); delay(120);
+  }
+}
+
 static camera_fb_t *captureWithFlash() {
   digitalWrite(FLASH_LED_PIN, HIGH);
   delay(150);                                   // let exposure settle under the flash
@@ -276,6 +289,9 @@ void setup() {
 
   pinMode(FLASH_LED_PIN, OUTPUT);
   digitalWrite(FLASH_LED_PIN, LOW);
+  pinMode(STATUS_LED_PIN, OUTPUT);
+  digitalWrite(STATUS_LED_PIN, HIGH);                 // off
+  blinkStatusLed(1);                                  // one blink = booted
   cameraReady = initCamera();
 
   pinMode(PIN_TRIGGER_IN, INPUT_PULLDOWN);     // floating input must never look like a trigger
@@ -298,6 +314,7 @@ void loop() {
     triggerPending = false;
     if (elapsedMs(millis(), lastTriggerMs, TRIGGER_COOLDOWN_MS)) {
       lastTriggerMs = millis();
+      blinkStatusLed(2);                              // two blinks = TRIG pulse received
       handleTrigger("GPIO trigger");
       triggerPending = false;                  // triggers that arrived while busy are stale
     }

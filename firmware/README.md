@@ -46,3 +46,11 @@ Register the camera first: `POST /api/admin/devices {"device_id":"box-01-cam","b
 
 Typical failures: `upload -> 401` wrong key (or the main board's key), `-> 415` not a JPEG, `capture failed` / reboots = 5 V supply too weak,
 `[HTTP] pending -> 401` camera registered without the right `box_id`.
+
+### Stacked ESP32-CAM-MB base: no breakout
+With the module plugged into the MB base its pins (5V, GND, GPIO13) are hidden, so the TRIG wire cannot be attached.
+- **Phase 1 - module on the base (USB):** tests C1-C3, and the delivery-to-LINE path without the wire: simulate the main board in `/docs`
+  (verify-qr -> door_opened -> locked) and type `c` in the camera's Serial Monitor.
+- **Phase 2 - the wire:** flash the camera on the base first, then unplug the module, power it from 5 V (own supply, not through the main board's USB if it browns out)
+  and wire `5V`, `GND`, `IO13` (module header labels). No Serial is needed: the onboard red LED blinks **once at boot** and **twice when a TRIG pulse arrives**;
+  a delivery then fires the flash and LINE gets the photo. GPIO0 must NOT be grounded while running.
