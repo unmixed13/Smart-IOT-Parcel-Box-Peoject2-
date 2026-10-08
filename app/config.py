@@ -85,6 +85,7 @@ class Settings(BaseSettings):
     door_ajar_seconds: int = 60         # Tajar: door left open -> buzzer + LINE (once)
     image_wait_seconds: int = 30        # wait for camera image after lock report
     sweeper_interval_seconds: float = 1.0
+    tamper_alert_cooldown_seconds: int = 60  # at most one tamper LINE alert per box per this many seconds
     notify_door_events: bool = True     # LINE message when the door opens / closes-and-locks
 
     # --- File storage ---

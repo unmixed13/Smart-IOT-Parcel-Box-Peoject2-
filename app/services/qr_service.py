@@ -12,6 +12,7 @@ QR code life cycle (thesis table 3.1) and the device-event state machine.
 Every function here works on one AsyncSession and returns what the caller
 should notify; sending LINE messages is the caller's job (after commit).
 """
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
@@ -37,6 +38,9 @@ class Notice:
 class Outcome:
     notices: list[Notice] = field(default_factory=list)
     broadcast: list[dict] = field(default_factory=list)
+
+
+_last_tamper_alert: dict[str, float] = {}   # box_id -> time.monotonic() of the last LINE alert (per process)
 
 
 def _log(db: AsyncSession, device_id: str, etype: EventType, result: AccessResult, notes: str, code: str | None = None) -> None:
@@ -151,13 +155,21 @@ async def apply_device_event(db: AsyncSession, device: Device, req: DeviceEventR
         return DeviceEventResponse(accepted=True, detail="logged"), out
 
     if req.type == "tamper":
-        _log(db, device.device_id, EventType.TAMPER, AccessResult.ERROR, "door opened while locked")
+        # Every tamper is logged; the LINE alert is rate-limited so a rattling door cannot burn the monthly quota.
+        mono = time.monotonic()
+        last = _last_tamper_alert.get(device.box)
+        alert = last is None or mono - last >= settings.tamper_alert_cooldown_seconds
+        if alert:
+            _last_tamper_alert[device.box] = mono
+        _log(db, device.device_id, EventType.TAMPER, AccessResult.ERROR,
+             "door opened while locked" + ("" if alert else " (LINE alert suppressed: cooldown)"))
         await db.commit()
-        owners = [u for (u,) in (await db.execute(select(BoxBinding.line_user_id).where(BoxBinding.box_id == device.box))).all()]
-        for u in owners or [None]:
-            out.notices.append(Notice(u, f"🚨 Box {device.box}: the door was opened while locked (possible tampering)."))
+        if alert:
+            owners = [u for (u,) in (await db.execute(select(BoxBinding.line_user_id).where(BoxBinding.box_id == device.box))).all()]
+            for u in owners or [None]:
+                out.notices.append(Notice(u, f"🚨 Box {device.box}: the door was opened while locked (possible tampering)."))
         out.broadcast.append({"event": "tamper", "device_id": device.device_id})
-        return DeviceEventResponse(accepted=True, detail="logged"), out
+        return DeviceEventResponse(accepted=True, detail="logged" if alert else "logged_alert_suppressed"), out
 
     if req.event_id is None:
         return DeviceEventResponse(accepted=False, detail="event_id_required"), out

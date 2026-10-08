@@ -217,3 +217,13 @@ def test_line_messages_for_door_open_and_close(c, box):
     texts = [m["text"] for m in sent]
     assert texts.index(next(t for t in texts if "was opened" in t)) < texts.index(next(t for t in texts if "closed and locked" in t)) \
         < texts.index(next(t for t in texts if "delivered" in t))
+
+
+def test_tamper_line_alert_is_rate_limited_but_every_tamper_is_logged(c, box):
+    first = event(c, box, "tamper").json()
+    second = event(c, box, "tamper").json()
+    third = event(c, box, "tamper").json()
+    assert first["detail"] == "logged" and second["detail"] == third["detail"] == "logged_alert_suppressed"
+    assert len([m for m in sent if "tampering" in m["text"]]) == 1
+    logs = c.get("/api/hardware/logs?limit=50", headers=ADMIN).json()
+    assert len([r for r in logs if r["event_type"] == "tamper" and r["device_id"] == box["id"]]) == 3
