@@ -38,6 +38,12 @@
 #endif
 #include "box_logic.h"
 
+// Buzzer polarity. 0 = HIGH makes it sound (bare buzzer behind the 2N7000, or an active-HIGH module).
+// 1 = LOW makes it sound (modules sold as "low level trigger"): set this in config.h.
+#ifndef BUZZER_ACTIVE_LOW
+#define BUZZER_ACTIVE_LOW 0
+#endif
+
 #define FW_VERSION "2.1.0"
 
 // ---------------------------------------------------------------------------
@@ -47,7 +53,7 @@ class EspHal : public pb::Hal {
  public:
   uint32_t millis() override { return ::millis(); }
   void coil(bool on) override { digitalWrite(PIN_LOCK_SIG, on ? HIGH : LOW); }
-  void buzzer(bool on) override { digitalWrite(PIN_BUZZ_SIG, on ? HIGH : LOW); }
+  void buzzer(bool on) override { digitalWrite(PIN_BUZZ_SIG, (on != (BUZZER_ACTIVE_LOW != 0)) ? HIGH : LOW); }
   void camPin(bool high) override { digitalWrite(PIN_CAM_TRIG, high ? HIGH : LOW); }
   bool doorClosedRaw() override { return digitalRead(PIN_DOOR_SW) == LOW; }
   bool buttonPressedRaw() override { return digitalRead(PIN_UNLOCK_BTN_SIG) == LOW; }
@@ -264,7 +270,7 @@ static void watchdogBegin(uint32_t seconds) {
 void setup() {
   // Coil first: drive it LOW before anything else (the pull-down already holds it off).
   pinMode(PIN_LOCK_SIG, OUTPUT);   digitalWrite(PIN_LOCK_SIG, LOW);
-  pinMode(PIN_BUZZ_SIG, OUTPUT);   digitalWrite(PIN_BUZZ_SIG, LOW);
+  pinMode(PIN_BUZZ_SIG, OUTPUT);   digitalWrite(PIN_BUZZ_SIG, BUZZER_ACTIVE_LOW ? HIGH : LOW);   // silent
   pinMode(PIN_CAM_TRIG, OUTPUT);   digitalWrite(PIN_CAM_TRIG, LOW);
   pinMode(PIN_DOOR_SW, INPUT_PULLUP);
   pinMode(PIN_UNLOCK_BTN_SIG, INPUT_PULLUP);

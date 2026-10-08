@@ -27,3 +27,8 @@
 #define PIN_UNLOCK_BTN_SIG  32   // push button to GND, internal pull-up (LOW = pressed)
 
 #define SCANNER_BAUD        9600  // GM66 factory default
+
+// Buzzer: 0 = sounds when the pin is HIGH (bare buzzer + 2N7000, or an active-HIGH module)
+//         1 = sounds when the pin is LOW  (3-pin module marked "low level trigger")
+// A 3-pin module (I/O, VCC, GND) is wired I/O -> GPIO13, VCC -> 5V, GND -> GND; no 2N7000 needed.
+#define BUZZER_ACTIVE_LOW   0
