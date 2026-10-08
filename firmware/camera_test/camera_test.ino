@@ -42,6 +42,7 @@
 
 WebServer web(80);
 bool flashOn = false;
+int vflipNow = CAM_VFLIP, hmirrorNow = CAM_HMIRROR;
 
 bool initCamera() {
   camera_config_t c = {};
@@ -137,7 +138,7 @@ void setup() {
       web.on("/", handleRoot); web.on("/photo", handlePhoto); web.begin();
     } else Serial.println("\nWi-Fi FAILED");
   }
-  Serial.println("Commands: p=photo  u=upload to server/LINE  f=flash toggle  t=watch TRIG(GPIO13) 10s");
+  Serial.println("Commands: p=photo  u=upload to server/LINE  v=flip up/down  m=mirror left/right  f=flash toggle  t=watch TRIG(GPIO13) 10s");
 }
 
 void loop() {
@@ -146,6 +147,12 @@ void loop() {
   char ch = Serial.read();
   if (ch == 'p') shoot();
   else if (ch == 'u') uploadPhoto();
+  else if (ch == 'v' || ch == 'm') {
+    sensor_t* sn = esp_camera_sensor_get();
+    if (ch == 'v') vflipNow = !vflipNow; else hmirrorNow = !hmirrorNow;
+    if (sn) { sn->set_vflip(sn, vflipNow); sn->set_hmirror(sn, hmirrorNow); }
+    Serial.printf("vflip=%d hmirror=%d  (type u or open the web page to see it)\n", vflipNow, hmirrorNow);
+  }
   else if (ch == 'f') { flashOn = !flashOn; digitalWrite(FLASH_PIN, flashOn); Serial.println(flashOn ? "flash ON" : "flash OFF"); }
   else if (ch == 't') {
     Serial.println("watching GPIO13 for 10 s (pulse it from the main board)...");
