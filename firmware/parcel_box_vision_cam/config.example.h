@@ -41,3 +41,7 @@
 #define VSYNC_GPIO_NUM    25
 #define HREF_GPIO_NUM     23
 #define PCLK_GPIO_NUM     22
+
+// Image orientation (the module is usually mounted so the picture comes out upside down)
+#define CAM_VFLIP   1   // 1 = flip vertically, 0 = off
+#define CAM_HMIRROR 0   // 1 = mirror left-right

@@ -37,6 +37,8 @@
 #define FLASH_PIN 4
 #define LED_PIN 33      // red LED, active LOW
 #define TRIG_PIN 13
+#define CAM_VFLIP   1   // upside down? toggle 0/1
+#define CAM_HMIRROR 0   // mirrored left-right? set 1
 
 WebServer web(80);
 bool flashOn = false;
@@ -62,6 +64,8 @@ bool initCamera() {
   }
   esp_err_t e = esp_camera_init(&c);
   if (e != ESP_OK) { Serial.printf("Camera init FAILED 0x%x\n", e); return false; }
+  sensor_t* sn = esp_camera_sensor_get();
+  if (sn) { sn->set_vflip(sn, CAM_VFLIP); sn->set_hmirror(sn, CAM_HMIRROR); }
   Serial.println("OV2640 ready");
   return true;
 }

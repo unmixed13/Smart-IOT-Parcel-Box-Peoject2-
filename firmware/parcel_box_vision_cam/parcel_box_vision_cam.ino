@@ -84,6 +84,14 @@ static bool initCamera() {
     s->set_whitebal(s, 1);
     s->set_awb_gain(s, 1);
     s->set_wb_mode(s, 0);
+#ifndef CAM_VFLIP
+#define CAM_VFLIP 1     // image upside down? flip 0/1
+#endif
+#ifndef CAM_HMIRROR
+#define CAM_HMIRROR 0   // image mirrored left-right? set 1
+#endif
+    s->set_vflip(s, CAM_VFLIP);
+    s->set_hmirror(s, CAM_HMIRROR);
   }
   Serial.println("[CAM] OV2640 ready");
   return true;
