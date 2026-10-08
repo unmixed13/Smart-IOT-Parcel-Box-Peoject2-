@@ -34,7 +34,7 @@
 #error "Copy config.example.h to config.h and edit it (Wi-Fi, server address, device API key)."
 #endif
 
-#define FW_VERSION "2.1.0"
+#define FW_VERSION "2.2.0"
 
 volatile bool triggerPending = false;
 static uint32_t lastTriggerMs = 0;
@@ -142,7 +142,8 @@ static bool fetchPending(char *eventId, int *expiresIn) {
 // Raw JPEG body, exactly what the server's /api/upload-image/raw expects.
 static int uploadJpeg(const uint8_t *jpg, size_t len, const char *eventId, char *resp, size_t cap) {
   char path[96];
-  snprintf(path, sizeof(path), "/api/upload-image/raw?event_id=%s", eventId);
+  if (eventId && eventId[0]) snprintf(path, sizeof(path), "/api/upload-image/raw?event_id=%s", eventId);
+  else snprintf(path, sizeof(path), "/api/upload-image/raw");        // bench test: stored + logged, no LINE
   WiFiClient client;
   HTTPClient http;
   http.setConnectTimeout(3000);
@@ -237,6 +238,22 @@ static void handleTrigger(const char *source) {
   Serial.println(done ? "[DONE] photo uploaded" : "[DONE] photo NOT uploaded");
 }
 
+// Bench test (serial 'p'): take a photo with the flash and upload it WITHOUT an Event-ID.
+// Proves the camera, the Wi-Fi link, the device key and the server's upload path on their own;
+// the server stores the file and logs it ("Image captured and stored"), but sends no LINE message.
+static void benchPhoto() {
+  Serial.println("\n[BENCH] photo + upload test");
+  if (!cameraReady) { Serial.println("[BENCH] camera not initialised"); return; }
+  if (WiFi.status() != WL_CONNECTED) { Serial.println("[BENCH] Wi-Fi not connected"); return; }
+  camera_fb_t *fb = captureWithFlash();
+  if (!fb) { Serial.println("[BENCH] capture failed"); return; }
+  Serial.printf("[BENCH] captured %u bytes (%ux%u)\n", (unsigned)fb->len, (unsigned)fb->width, (unsigned)fb->height);
+  char resp[160];
+  int code = uploadJpeg(fb->buf, fb->len, "", resp, sizeof(resp));
+  esp_camera_fb_return(fb);
+  Serial.println(code == 201 ? "[BENCH] OK - the photo reached the server (check the dashboard: CAPTURE)" : "[BENCH] FAILED - see the HTTP code above (401 = wrong key, 415 = not a JPEG)");
+}
+
 // ---------------------------------------------------------------------------
 static void watchdogBegin(uint32_t seconds) {
 #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
@@ -270,7 +287,7 @@ void setup() {
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
   watchdogBegin(40);   // longest legitimate stretch: 12 s polling + 4 x (8 s upload + back-off), reset between steps
-  Serial.println("[SYS] ready - waiting for trigger on GPIO" + String(PIN_TRIGGER_IN) + " (or type 'c' to test)");
+  Serial.println("[SYS] ready - waiting for trigger on GPIO" + String(PIN_TRIGGER_IN) + " (serial: 'p' = photo+upload test, 'c' = full trigger flow)");
 }
 
 void loop() {
@@ -289,6 +306,7 @@ void loop() {
   while (Serial.available()) {                 // bench test without the main board
     char ch = Serial.read();
     if (ch == 'c' || ch == 'C') { lastTriggerMs = millis(); handleTrigger("serial 'c'"); }
+    if (ch == 'p' || ch == 'P') benchPhoto();
   }
 
   if (WiFi.status() == WL_CONNECTED && elapsedMs(millis(), lastHeartbeatMs, 30000)) {
