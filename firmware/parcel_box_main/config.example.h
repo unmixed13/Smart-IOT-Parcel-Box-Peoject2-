@@ -32,3 +32,8 @@
 //         1 = sounds when the pin is LOW  (3-pin module marked "low level trigger")
 // A 3-pin module (I/O, VCC, GND) is wired I/O -> GPIO13, VCC -> 5V, GND -> GND; no 2N7000 needed.
 #define BUZZER_ACTIVE_LOW   0
+
+// Buzzer type: 0 = ACTIVE (power it and it beeps) - what the thesis lists.
+//              1 = PASSIVE (only clicks on DC; bare green PCB underneath): the pin outputs a tone.
+#define BUZZER_PASSIVE      0
+#define BUZZER_FREQ_HZ      2700   // pitch used in passive mode (2000-4000 Hz is loudest)

@@ -44,16 +44,55 @@
 #define BUZZER_ACTIVE_LOW 0
 #endif
 
-#define FW_VERSION "2.1.0"
+// Buzzer type. 0 = ACTIVE buzzer (built-in oscillator: power on = beep; the default).
+// 1 = PASSIVE buzzer (only clicks on DC): the pin is driven with a BUZZER_FREQ_HZ tone instead.
+#ifndef BUZZER_PASSIVE
+#define BUZZER_PASSIVE 0
+#endif
+#ifndef BUZZER_FREQ_HZ
+#define BUZZER_FREQ_HZ 2700
+#endif
+#define BUZZER_LEDC_CH 4   // only used with ESP32 Arduino core 2.x
+
+#define FW_VERSION "2.2.0"
 
 // ---------------------------------------------------------------------------
 // Hardware abstraction
 // ---------------------------------------------------------------------------
+#if BUZZER_PASSIVE
+static void buzzerTone(bool on) {
+  if (on) {
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+    ledcAttach(PIN_BUZZ_SIG, BUZZER_FREQ_HZ, 8);
+    ledcWriteTone(PIN_BUZZ_SIG, BUZZER_FREQ_HZ);
+#else
+    ledcSetup(BUZZER_LEDC_CH, BUZZER_FREQ_HZ, 8);
+    ledcAttachPin(PIN_BUZZ_SIG, BUZZER_LEDC_CH);
+    ledcWriteTone(BUZZER_LEDC_CH, BUZZER_FREQ_HZ);
+#endif
+  } else {
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+    ledcDetach(PIN_BUZZ_SIG);
+#else
+    ledcDetachPin(PIN_BUZZ_SIG);
+#endif
+    pinMode(PIN_BUZZ_SIG, OUTPUT);
+    digitalWrite(PIN_BUZZ_SIG, BUZZER_ACTIVE_LOW ? HIGH : LOW);   // idle level = silent
+  }
+}
+#endif
+
 class EspHal : public pb::Hal {
  public:
   uint32_t millis() override { return ::millis(); }
   void coil(bool on) override { digitalWrite(PIN_LOCK_SIG, on ? HIGH : LOW); }
-  void buzzer(bool on) override { digitalWrite(PIN_BUZZ_SIG, (on != (BUZZER_ACTIVE_LOW != 0)) ? HIGH : LOW); }
+  void buzzer(bool on) override {
+#if BUZZER_PASSIVE
+    buzzerTone(on);
+#else
+    digitalWrite(PIN_BUZZ_SIG, (on != (BUZZER_ACTIVE_LOW != 0)) ? HIGH : LOW);
+#endif
+  }
   void camPin(bool high) override { digitalWrite(PIN_CAM_TRIG, high ? HIGH : LOW); }
   bool doorClosedRaw() override { return digitalRead(PIN_DOOR_SW) == LOW; }
   bool buttonPressedRaw() override { return digitalRead(PIN_UNLOCK_BTN_SIG) == LOW; }
