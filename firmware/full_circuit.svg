@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="1290" viewBox="0 0 1300 1290" font-family="DejaVu Sans, Arial, sans-serif">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="30" y="36" font-size="22" font-weight="bold" fill="#111">Complete circuit: ESP32 + GM66 + reed + buzzer + ESP32-CAM + solenoid lock + 12 V power</text>
+<text x="30" y="60" font-size="13" fill="#555">Labels "+5V" (red) all join the XL4015 5.0 V output; every "GND" joins the one common GND rail at the bottom. 12 V goes ONLY to the solenoid and the XL4015 input.</text>
+<rect x="80" y="80" width="200" height="680" rx="8" fill="#eef3fb" stroke="#245" stroke-width="2.5"/>
+<text x="180" y="110" font-size="17" fill="#111" text-anchor="middle" font-weight="bold">ESP32 DevKit</text>
+<text x="180" y="130" font-size="12" fill="#555" text-anchor="middle" font-weight="normal">(main controller)</text>
+<line x1="280" y1="160" x2="300" y2="160" stroke="#222" stroke-width="2"/>
+<text x="272" y="164" font-size="12" fill="#111" text-anchor="end" font-weight="normal">VIN</text>
+<line x1="280" y1="200" x2="300" y2="200" stroke="#222" stroke-width="2"/>
+<text x="272" y="204" font-size="12" fill="#111" text-anchor="end" font-weight="normal">GND</text>
+<line x1="280" y1="250" x2="300" y2="250" stroke="#222" stroke-width="2"/>
+<text x="272" y="254" font-size="12" fill="#111" text-anchor="end" font-weight="normal">GPIO17 (TX2)</text>
+<line x1="280" y1="290" x2="300" y2="290" stroke="#222" stroke-width="2"/>
+<text x="272" y="294" font-size="12" fill="#111" text-anchor="end" font-weight="normal">GPIO16 (RX2)</text>
+<line x1="280" y1="420" x2="300" y2="420" stroke="#222" stroke-width="2"/>
+<text x="272" y="424" font-size="12" fill="#111" text-anchor="end" font-weight="normal">GPIO25  DOOR_SW</text>
+<line x1="280" y1="480" x2="300" y2="480" stroke="#222" stroke-width="2"/>
+<text x="272" y="484" font-size="12" fill="#111" text-anchor="end" font-weight="normal">GPIO32  UNLOCK_BTN</text>
+<line x1="280" y1="560" x2="300" y2="560" stroke="#222" stroke-width="2"/>
+<text x="272" y="564" font-size="12" fill="#111" text-anchor="end" font-weight="normal">GPIO13  BUZZ_SIG</text>
+<line x1="280" y1="670" x2="300" y2="670" stroke="#222" stroke-width="2"/>
+<text x="272" y="674" font-size="12" fill="#111" text-anchor="end" font-weight="normal">GPIO14  CAM_TRIG</text>
+<line x1="280" y1="710" x2="300" y2="710" stroke="#222" stroke-width="2"/>
+<text x="272" y="714" font-size="12" fill="#111" text-anchor="end" font-weight="normal">GPIO18  LOCK_SIG</text>
+<line x1="300" y1="160" x2="330" y2="160" stroke="#c0281c" stroke-width="2"/>
+<text x="334" y="164" font-size="13" fill="#c0281c" text-anchor="start" font-weight="bold">+5V</text>
+<line x1="300" y1="200" x2="330" y2="200" stroke="#222" stroke-width="2"/>
+<text x="334" y="204" font-size="13" fill="#222" text-anchor="start" font-weight="bold">GND</text>
+<rect x="800" y="205" width="230" height="180" rx="8" fill="#fff6e6" stroke="#852" stroke-width="2.5"/>
+<text x="915" y="227" font-size="16" fill="#111" text-anchor="middle" font-weight="bold">GM66 scanner</text>
+<line x1="780" y1="250" x2="800" y2="250" stroke="#222" stroke-width="2"/>
+<text x="812" y="254" font-size="12" fill="#111" text-anchor="start" font-weight="normal">RXD</text>
+<line x1="780" y1="290" x2="800" y2="290" stroke="#222" stroke-width="2"/>
+<text x="812" y="294" font-size="12" fill="#111" text-anchor="start" font-weight="normal">TXD</text>
+<line x1="780" y1="330" x2="800" y2="330" stroke="#222" stroke-width="2"/>
+<text x="812" y="334" font-size="12" fill="#111" text-anchor="start" font-weight="normal">DC5V</text>
+<line x1="780" y1="365" x2="800" y2="365" stroke="#222" stroke-width="2"/>
+<text x="812" y="369" font-size="12" fill="#111" text-anchor="start" font-weight="normal">GND</text>
+<line x1="300" y1="250" x2="780" y2="250" stroke="#222" stroke-width="2"/>
+<text x="540" y="242" font-size="12" fill="#555" text-anchor="middle" font-weight="normal">direct (3.3 V from ESP32)</text>
+<line x1="300" y1="290" x2="420" y2="290" stroke="#222" stroke-width="2"/>
+<circle cx="420" cy="290" r="4" fill="#222"/>
+<line x1="420" y1="290" x2="520" y2="290" stroke="#222" stroke-width="2"/>
+<rect x="520" y="281" width="46" height="18" fill="#fff" stroke="#222" stroke-width="2"/>
+<text x="543" y="276" font-size="13" fill="#111" text-anchor="middle" font-weight="normal">R1 1k</text>
+<line x1="566" y1="290" x2="780" y2="290" stroke="#222" stroke-width="2"/>
+<line x1="420" y1="290" x2="420" y2="310" stroke="#222" stroke-width="2"/>
+<rect x="411" y="310" width="18" height="46" fill="#fff" stroke="#222" stroke-width="2"/>
+<text x="436" y="338" font-size="13" fill="#111" text-anchor="start" font-weight="normal">R2 2k</text>
+<line x1="420" y1="356" x2="420" y2="366" stroke="#222" stroke-width="2"/>
+<line x1="420" y1="366" x2="420" y2="374" stroke="#222" stroke-width="2"/>
+<line x1="410" y1="374" x2="430" y2="374" stroke="#222" stroke-width="2"/>
+<line x1="414" y1="379" x2="426" y2="379" stroke="#222" stroke-width="2"/>
+<line x1="417" y1="384" x2="423" y2="384" stroke="#222" stroke-width="2"/>
+<text x="560" y="316" font-size="12" fill="#a33" text-anchor="middle" font-weight="normal">TXD idle ~5 V -> ~3.3 V at GPIO16</text>
+<line x1="780" y1="330" x2="750" y2="330" stroke="#c0281c" stroke-width="2"/>
+<text x="746" y="334" font-size="13" fill="#c0281c" text-anchor="end" font-weight="bold">+5V</text>
+<line x1="780" y1="365" x2="750" y2="365" stroke="#222" stroke-width="2"/>
+<text x="746" y="369" font-size="13" fill="#222" text-anchor="end" font-weight="bold">GND</text>
+<rect x="800" y="405" width="230" height="40" rx="6" fill="#eef9ee" stroke="#262" stroke-width="2"/>
+<text x="915" y="430" font-size="14" fill="#111" text-anchor="middle" font-weight="normal">Reed switch (MC-38)</text>
+<line x1="300" y1="420" x2="800" y2="420" stroke="#222" stroke-width="2"/>
+<text x="550" y="412" font-size="12" fill="#555" text-anchor="middle" font-weight="normal">door closed = LOW (internal pull-up)</text>
+<line x1="780" y1="440" x2="800" y2="440" stroke="#222" stroke-width="2"/>
+<text x="776" y="444" font-size="13" fill="#222" text-anchor="end" font-weight="bold">GND</text>
+<rect x="800" y="465" width="230" height="40" rx="6" fill="#eef9ee" stroke="#262" stroke-width="2"/>
+<text x="915" y="490" font-size="14" fill="#111" text-anchor="middle" font-weight="normal">Push button (optional)</text>
+<line x1="300" y1="480" x2="800" y2="480" stroke="#222" stroke-width="2"/>
+<text x="550" y="472" font-size="12" fill="#555" text-anchor="middle" font-weight="normal">pressed = LOW (internal pull-up)</text>
+<line x1="780" y1="500" x2="800" y2="500" stroke="#222" stroke-width="2"/>
+<text x="776" y="504" font-size="13" fill="#222" text-anchor="end" font-weight="bold">GND</text>
+<rect x="800" y="530" width="230" height="130" rx="8" fill="#f6eefb" stroke="#527" stroke-width="2.5"/>
+<text x="915" y="553" font-size="15" fill="#111" text-anchor="middle" font-weight="bold">Buzzer module (3-pin)</text>
+<line x1="780" y1="585" x2="800" y2="585" stroke="#222" stroke-width="2"/>
+<text x="812" y="589" font-size="12" fill="#111" text-anchor="start" font-weight="normal">I/O</text>
+<line x1="780" y1="610" x2="800" y2="610" stroke="#222" stroke-width="2"/>
+<text x="812" y="614" font-size="12" fill="#111" text-anchor="start" font-weight="normal">VCC</text>
+<line x1="780" y1="635" x2="800" y2="635" stroke="#222" stroke-width="2"/>
+<text x="812" y="639" font-size="12" fill="#111" text-anchor="start" font-weight="normal">GND</text>
+<line x1="300" y1="560" x2="540" y2="560" stroke="#222" stroke-width="2"/>
+<line x1="540" y1="560" x2="540" y2="585" stroke="#222" stroke-width="2"/>
+<line x1="540" y1="585" x2="780" y2="585" stroke="#222" stroke-width="2"/>
+<text x="420" y="552" font-size="12" fill="#555" text-anchor="start" font-weight="normal">low-level-trigger module: BUZZER_ACTIVE_LOW 1</text>
+<line x1="780" y1="610" x2="750" y2="610" stroke="#c0281c" stroke-width="2"/>
+<text x="746" y="614" font-size="13" fill="#c0281c" text-anchor="end" font-weight="bold">+5V</text>
+<line x1="780" y1="635" x2="750" y2="635" stroke="#222" stroke-width="2"/>
+<text x="746" y="639" font-size="13" fill="#222" text-anchor="end" font-weight="bold">GND</text>
+
+<polyline points="300,670 760,670 760,716 780,716" fill="none" stroke="#222" stroke-width="2"/>
+<text x="520" y="662" font-size="12" fill="#555" text-anchor="middle">TRIG pulse, 3.3 V (200 ms HIGH after the door closes)</text>
+<rect x="800" y="672" width="230" height="140" rx="8" fill="#eef7f9" stroke="#175" stroke-width="2.5"/>
+<text x="915" y="693" font-size="15" text-anchor="middle" font-weight="bold" fill="#111">ESP32-CAM (AI-Thinker)</text>
+<line x1="780" y1="716" x2="800" y2="716" stroke="#222" stroke-width="2"/><text x="812" y="720" font-size="12" fill="#111">GPIO13 (TRIG in)</text>
+<line x1="780" y1="745" x2="800" y2="745" stroke="#222" stroke-width="2"/><text x="776" y="749" font-size="13" fill="#222" text-anchor="end" font-weight="bold">GND</text><text x="812" y="749" font-size="12" fill="#111">GND</text>
+
+<line x1="780" y1="780" x2="800" y2="780" stroke="#222" stroke-width="2"/><text x="812" y="784" font-size="12" fill="#111">5V</text>
+<line x1="780" y1="780" x2="750" y2="780" stroke="#c0281c" stroke-width="2"/><text x="746" y="784" font-size="13" fill="#c0281c" text-anchor="end" font-weight="bold">+5V</text>
+<text x="812" y="802" font-size="11" fill="#a33">(not the USB base; never IO0 to GND)</text>
+<!-- gate wire from GPIO18 -->
+<polyline points="300,710 340,710 340,1150 380,1150" fill="none" stroke="#2e7d32" stroke-width="2.5"/>
+<text x="352" y="760" font-size="12" fill="#2e7d32" font-weight="bold">GPIO18</text>
+<rect x="380" y="1138" width="60" height="24" fill="#fff" stroke="#222" stroke-width="2"/><text x="410" y="1130" font-size="12" text-anchor="middle">220 ohm</text>
+<line x1="440" y1="1150" x2="760" y2="1150" stroke="#2e7d32" stroke-width="2.5"/>
+<circle cx="700" cy="1150" r="4" fill="#2e7d32"/>
+<line x1="700" y1="1150" x2="700" y2="1172" stroke="#2e7d32" stroke-width="2.5"/>
+<rect x="688" y="1172" width="24" height="34" fill="#fff" stroke="#222" stroke-width="2"/><text x="724" y="1194" font-size="12">10k</text>
+<line x1="700" y1="1206" x2="700" y2="1240" stroke="#222" stroke-width="2.5"/>
+<!-- Q1 -->
+<rect x="760" y="1100" width="180" height="80" rx="8" fill="#f1f1f1" stroke="#444" stroke-width="2.5"/>
+<text x="850" y="1122" font-size="14" text-anchor="middle" font-weight="bold">Q1 IRLZ44N</text>
+<text x="772" y="1154" font-size="13" font-weight="bold">G</text><text x="835" y="1118" font-size="0">D</text>
+<text x="860" y="1140" font-size="13" font-weight="bold">D top / S bottom</text>
+<line x1="850" y1="1180" x2="850" y2="1240" stroke="#222" stroke-width="2.5"/>
+<!-- solenoid -->
+<rect x="780" y="950" width="140" height="70" rx="8" fill="#eef3fb" stroke="#1f3a5a" stroke-width="2.5"/>
+<text x="850" y="980" font-size="14" text-anchor="middle" font-weight="bold">Solenoid 12 V</text>
+<text x="850" y="1000" font-size="11" text-anchor="middle" fill="#555">(no polarity)</text>
+<line x1="850" y1="915" x2="850" y2="950" stroke="#c62828" stroke-width="3"/><circle cx="850" cy="915" r="4" fill="#c62828"/>
+<line x1="850" y1="1020" x2="850" y2="1100" stroke="#1565c0" stroke-width="3"/>
+<!-- diode -->
+<line x1="960" y1="915" x2="960" y2="957" stroke="#c62828" stroke-width="3"/><circle cx="960" cy="915" r="4" fill="#c62828"/>
+<polygon points="945,985 975,985 960,960" fill="#fff" stroke="#000" stroke-width="2"/>
+<line x1="945" y1="957" x2="975" y2="957" stroke="#000" stroke-width="3"/>
+<line x1="960" y1="985" x2="960" y2="1060" stroke="#1565c0" stroke-width="3"/>
+<line x1="960" y1="1060" x2="850" y2="1060" stroke="#1565c0" stroke-width="3"/><circle cx="850" cy="1060" r="4" fill="#1565c0"/>
+<text x="972" y="945" font-size="12">1N4007</text><text x="972" y="1008" font-size="11" fill="#c62828">stripe up</text>
+<!-- 12V rail -->
+<line x1="520" y1="915" x2="1030" y2="915" stroke="#c62828" stroke-width="4"/>
+<text x="600" y="905" font-size="13" fill="#c62828" font-weight="bold">+12 V rail</text>
+<rect x="1030" y="903" width="50" height="24" fill="#fff" stroke="#000" stroke-width="2"/><text x="1055" y="895" font-size="12" text-anchor="middle">fuse 3A</text>
+<polyline points="1080,915 1095,915 1095,935 1110,935" fill="none" stroke="#c62828" stroke-width="4"/><line x1="0" y1="0" x2="0" y2="0" stroke="#c62828" stroke-width="4"/>
+<rect x="1110" y="880" width="170" height="100" rx="10" fill="#fff6e5" stroke="#8a5a1f" stroke-width="2.5"/>
+<text x="1195" y="900" font-size="14" font-weight="bold" text-anchor="middle">12 V adapter 5 A</text>
+<text x="1125" y="940" font-size="13" fill="#c62828" font-weight="bold">+12V</text>
+<text x="1125" y="965" font-size="13" font-weight="bold">GND</text>
+<polyline points="1110,960 1050,960 1050,1240" fill="none" stroke="#222" stroke-width="3"/>
+<!-- XL4015 -->
+<line x1="520" y1="915" x2="520" y2="1020" stroke="#c62828" stroke-width="4"/>
+<rect x="440" y="1020" width="160" height="100" rx="8" fill="#f0f0f0" stroke="#444" stroke-width="2.5"/>
+<text x="520" y="1044" font-size="14" font-weight="bold" text-anchor="middle">XL4015 buck</text>
+<text x="520" y="1062" font-size="11" text-anchor="middle" fill="#a33">OUT = 5.0 V (set first!)</text>
+<text x="530" y="1010" font-size="11" fill="#c62828" font-weight="bold">IN+ (12V)</text>
+<text x="456" y="1114" font-size="11" font-weight="bold">IN-</text>
+<line x1="470" y1="1120" x2="470" y2="1240" stroke="#222" stroke-width="3"/>
+<line x1="600" y1="1060" x2="650" y2="1060" stroke="#c0281c" stroke-width="3"/><text x="656" y="1064" font-size="13" fill="#c0281c" font-weight="bold">+5V (OUT+)</text>
+<line x1="600" y1="1100" x2="650" y2="1100" stroke="#222" stroke-width="3"/><text x="656" y="1104" font-size="13" font-weight="bold">GND (OUT-)</text>
+<!-- GND rail -->
+<line x1="40" y1="1240" x2="1100" y2="1240" stroke="#222" stroke-width="4"/>
+<text x="60" y="1266" font-size="13" font-weight="bold">common GND rail: adapter GND = XL4015 IN-/OUT- = Q1 source = ESP32 GND = every GND label</text>
+<text x="30" y="1286" font-size="13" font-weight="bold" fill="#b71c1c">Q1 must be IRLZ44N (logic level), not IRFZ44N. Check all wires against this picture BEFORE plugging in the adapter.</text>
+<text x="478" y="1190" font-size="11" fill="#555">(wires crossing here are NOT connected)</text></svg>
