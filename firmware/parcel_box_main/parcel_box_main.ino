@@ -33,6 +33,9 @@
 
 #if __has_include("config.h")
 #include "config.h"
+#ifndef LOCK_ACTIVE_LOW
+#define LOCK_ACTIVE_LOW 0   // 0 = GPIO HIGH unlocks (IRLZ44N direct); 1 = GPIO LOW unlocks (2N7000 + IRFZ44N driver)
+#endif
 #else
 #error "Copy config.example.h to config.h and edit it (Wi-Fi, server address, device API key)."
 #endif
@@ -62,7 +65,7 @@
 class EspHal : public pb::Hal {
  public:
   uint32_t millis() override { return ::millis(); }
-  void coil(bool on) override { digitalWrite(PIN_LOCK_SIG, on ? HIGH : LOW); }
+  void coil(bool on) override { digitalWrite(PIN_LOCK_SIG, (on != (LOCK_ACTIVE_LOW != 0)) ? HIGH : LOW); }
   void buzzer(bool on) override {
 #if BUZZER_PASSIVE
     passiveTone(on);
@@ -311,7 +314,8 @@ static void watchdogBegin(uint32_t seconds) {
 // ---------------------------------------------------------------------------
 void setup() {
   // Coil first: drive it LOW before anything else (the pull-down already holds it off).
-  pinMode(PIN_LOCK_SIG, OUTPUT);   digitalWrite(PIN_LOCK_SIG, LOW);
+  digitalWrite(PIN_LOCK_SIG, LOCK_ACTIVE_LOW ? HIGH : LOW);   // locked level before the pin becomes an output
+  pinMode(PIN_LOCK_SIG, OUTPUT);   digitalWrite(PIN_LOCK_SIG, LOCK_ACTIVE_LOW ? HIGH : LOW);
   pinMode(PIN_BUZZ_SIG, OUTPUT);   digitalWrite(PIN_BUZZ_SIG, BUZZER_ACTIVE_LOW ? HIGH : LOW);   // silent
   pinMode(PIN_CAM_TRIG, OUTPUT);   digitalWrite(PIN_CAM_TRIG, LOW);
   pinMode(PIN_DOOR_SW, INPUT_PULLUP);

@@ -26,6 +26,10 @@
 #define PIN_DOOR_SW         25   // reed switch to GND, internal pull-up (LOW = closed)
 #define PIN_UNLOCK_BTN_SIG  32   // push button to GND, internal pull-up (LOW = pressed)
 
+// Lock polarity: 0 = GPIO18 HIGH unlocks (IRLZ44N gate driven directly)
+//                1 = GPIO18 LOW unlocks  (2N7000 driving an IRFZ44N, inverted)
+#define LOCK_ACTIVE_LOW     0
+
 #define SCANNER_BAUD        9600  // GM66 factory default
 
 // Buzzer: 0 = sounds when the pin is HIGH (bare buzzer + 2N7000, or an active-HIGH module)
