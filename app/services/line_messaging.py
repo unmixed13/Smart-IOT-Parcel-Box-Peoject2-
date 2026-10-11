@@ -16,6 +16,7 @@ during local dev without a tunnel like ngrok/Cloudflare Tunnel), this
 module gracefully falls back to a text-only notification instead of
 failing the request.
 """
+import asyncio
 import logging
 from pathlib import Path
 
@@ -51,6 +52,29 @@ def _public_image_url(image_path: str) -> str | None:
     return f"{base}/media/{relative.as_posix()}"
 
 
+def _make_thumbnail(image_path: str) -> str | None:
+    """Small JPEG preview (<= 320 px wide) next to the original; None if Pillow is missing or it fails.
+
+    LINE shows the preview image first, so a tiny file loads even over a slow tunnel.
+    """
+    try:
+        from PIL import Image  # optional dependency (see requirements.txt)
+    except ImportError:
+        return None
+    src = Path(image_path)
+    dst = src.with_name(f"{src.stem}_thumb.jpg")
+    try:
+        if not dst.exists():
+            with Image.open(src) as im:
+                im = im.convert("RGB")
+                im.thumbnail((320, 320))
+                im.save(dst, "JPEG", quality=70, optimize=True)
+        return str(dst)
+    except Exception:
+        logger.warning("Could not create a thumbnail for %s", image_path, exc_info=True)
+        return None
+
+
 async def send_line_message(message: str, image_path: str | None = None, to: str | None = None) -> bool:
     """
     Push a text message (and, if possible, an image message) to the
@@ -69,10 +93,14 @@ async def send_line_message(message: str, image_path: str | None = None, to: str
     if image_path:
         image_url = _public_image_url(image_path)
         if image_url:
+            thumb_path = await asyncio.to_thread(_make_thumbnail, image_path)
+            preview_url = (_public_image_url(thumb_path) if thumb_path else None) or image_url
+            # A tappable link as a fallback: it opens in LINE's in-app browser even if the inline image fails to load.
+            messages[0]["text"] = f"{message}\n🖼 {image_url}"
             messages.append({
                 "type": "image",
                 "originalContentUrl": image_url,
-                "previewImageUrl": image_url,
+                "previewImageUrl": preview_url,
             })
         else:
             logger.debug(

@@ -108,7 +108,17 @@ register_exception_handlers(app)
 # fetch image attachments by URL (see app/services/line_messaging.py). Only
 # reachable from the outside if PUBLIC_BASE_URL points here through a
 # tunnel/reverse proxy; harmless to leave mounted otherwise.
-app.mount("/media", StaticFiles(directory=str(settings.upload_path)), name="media")
+class _MediaFiles(StaticFiles):
+    """File names are random UUIDs and never change, so clients may cache them."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=86400"
+        return response
+
+
+app.mount("/media", _MediaFiles(directory=str(settings.upload_path)), name="media")
 
 app.include_router(hardware.router, prefix=settings.api_v1_prefix)
 app.include_router(upload.router, prefix=settings.api_v1_prefix)
