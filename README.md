@@ -68,3 +68,25 @@ Use the **Authorize** button in `/docs` — all secured routes declare the key.
 - Tests: `pip install -r requirements-dev.txt && pytest`.
 - Never commit `.env`, `*.db` or logs (see `.gitignore`).
 - Firmware for both boards lives in `firmware/` (see `firmware/README.md`).
+
+## Project limitations and suggestions for further work
+
+### Limitations
+1. **Server hosting.** The prototype server runs on a personal computer (FastAPI + MariaDB/XAMPP) and is exposed through Tailscale Funnel. The system is available only while that computer is on and connected; it is not a production deployment.
+2. **Device link uses plain HTTP.** The ESP32 and ESP32-CAM firmware call the server over HTTP with a per-device API key. Traffic between the devices and the server is therefore not encrypted unless the server is reached over a trusted network or the firmware is changed to HTTPS.
+3. **Local image storage.** Photos are stored on the server's local disk (`uploads/`) and served from `/media`. There is no external object storage, retention policy or backup in the prototype.
+4. **Single box, single recipient.** The prototype is built and tested around one box (`box-01`) with one camera (`box-01-cam`). Multi-box and multi-tenant operation exists in the data model but has not been tested at scale.
+5. **Dependence on Wi-Fi and the Internet.** The box needs Wi-Fi to verify QR codes. If the network or server is down, the lock stays locked (fail-secure) and no parcel can be received.
+6. **Hardware.** The lock is switched by a single MOSFET driver from one 12 V supply; there is no battery backup, so a power cut leaves the box locked. The reed switch and button are the only door/override inputs, and the tamper detection depends on them.
+7. **Camera.** The ESP32-CAM takes one photo after the door closes; image quality depends on light and the flash, and the photo is not guaranteed if Wi-Fi is weak within the 30-second wait.
+8. **Test coverage.** Automated tests cover the server workflow and the firmware control logic on a PC. Long-duration, multi-user and security (penetration) testing was not performed.
+
+### Suggestions for further work
+1. Deploy the server to a cloud VPS or PaaS with a domain name and HTTPS, run it as a managed service, and add monitoring and automatic restart.
+2. Move the devices to HTTPS (TLS) and consider certificate pinning and key rotation for device API keys.
+3. Store images in object storage with a retention period; add database and image backups.
+4. Add a backup battery / UPS for the lock and controller, and a mechanical key or emergency release.
+5. Add more sensors (parcel presence/weight, door-lock state feedback, vibration for tamper detection) and a second camera angle.
+6. Support multiple boxes and users with an admin interface for registering boxes and rotating device keys.
+7. Add rate limiting and audit alerts on the public API, and perform a security review.
+8. Evaluate the system with user trials (delivery and recipient time, success rate, notification delay) and report measured results.
