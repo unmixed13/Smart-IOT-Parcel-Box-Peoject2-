@@ -417,9 +417,9 @@
       setWsStatus('live', 'connected — ' + wsUrl);
       state.wsRetryMs = 1000;
     };
-    ws.onclose = () => {
-      setWsStatus('down', 'disconnected — retrying…');
+    ws.onclose = (ev) => {
       if (state.ws !== ws) return;
+      setWsStatus('down', 'disconnected (code ' + ev.code + ') — retrying…');
       state.wsTimer = setTimeout(connectWs, state.wsRetryMs);
       state.wsRetryMs = Math.min(state.wsRetryMs * 1.6, 15000);
     };
