@@ -21,11 +21,15 @@ class ConnectionManager:
         self._connections: set[WebSocket] = set()
         self._lock = asyncio.Lock()
 
-    async def connect(self, websocket: WebSocket) -> None:
-        await websocket.accept()
+    async def add(self, websocket: WebSocket) -> None:
+        """Register an already-accepted (and authenticated) socket."""
         async with self._lock:
             self._connections.add(websocket)
         logger.info("Dashboard client connected (total=%d)", len(self._connections))
+
+    async def connect(self, websocket: WebSocket) -> None:
+        await websocket.accept()
+        await self.add(websocket)
 
     async def disconnect(self, websocket: WebSocket) -> None:
         async with self._lock:

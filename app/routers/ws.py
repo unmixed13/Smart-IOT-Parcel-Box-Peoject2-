@@ -1,18 +1,17 @@
 """
 Dashboard WebSocket endpoint.
 
-Clients connect here to receive a live stream of every hardware event —
-MQTT status updates, QR verification results, image captures, and manual
-unlock commands — all funneled through the shared ConnectionManager.
+Clients connect here to receive a live stream of every hardware event.
 
-Auth: intentionally separate from the hardware API key (that one is for
-ESP32 devices, not browsers). If DASHBOARD_TOKEN is set, the client must
-connect with `?token=<DASHBOARD_TOKEN>` in the URL (see dashboard.html's
-"Dashboard Token" field); a missing/wrong token is rejected before the
-handshake completes. Left open (with a startup warning) if unset, so local
-development keeps working without extra config.
+Auth: separate from the hardware API key. If DASHBOARD_TOKEN is set, the
+client must send {"token": "<DASHBOARD_TOKEN>"} as its FIRST message within
+5 seconds (the token is never placed in the URL, so it stays out of access
+logs). A missing/wrong token closes the socket with code 1008. If the token
+is unset, the endpoint is open (local development).
 """
+import asyncio
 import hmac
+import json
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
@@ -26,18 +25,25 @@ router = APIRouter(tags=["websocket"])
 
 
 @router.websocket("/ws/dashboard")
-async def dashboard_feed(websocket: WebSocket, token: str | None = None):
+async def dashboard_feed(websocket: WebSocket):
+    await websocket.accept()
+
     if settings.dashboard_token:
-        if not token or not hmac.compare_digest(token, settings.dashboard_token):
+        try:
+            raw = await asyncio.wait_for(websocket.receive_text(), timeout=5)
+            token = json.loads(raw).get("token", "")
+        except Exception:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+        if not isinstance(token, str) or not hmac.compare_digest(
+            token, settings.dashboard_token
+        ):
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
 
-    await manager.connect(websocket)
+    await manager.add(websocket)
     try:
         while True:
-            # We don't expect inbound messages, but must keep receiving to
-            # detect disconnects promptly; ping/pong frames are handled by
-            # the underlying ASGI server automatically.
             await websocket.receive_text()
     except WebSocketDisconnect:
         pass

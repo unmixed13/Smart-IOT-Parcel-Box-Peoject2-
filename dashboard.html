@@ -401,8 +401,7 @@
       state.ws.onclose = state.ws.onerror = state.ws.onmessage = state.ws.onopen = null;
       try { state.ws.close(); } catch (e) {}
     }
-    const wsUrl = state.base.replace(/^http/, 'ws') + '/ws/dashboard'
-      + (state.dashboardToken ? '?token=' + encodeURIComponent(state.dashboardToken) : '');
+    const wsUrl = state.base.replace(/^http/, 'ws') + '/ws/dashboard';
     setWsStatus('connecting', 'connecting…');
     let ws;
     try {
@@ -414,6 +413,7 @@
     state.ws = ws;
 
     ws.onopen = () => {
+      ws.send(JSON.stringify({ token: state.dashboardToken || '' }));
       setWsStatus('live', 'connected — ' + wsUrl);
       state.wsRetryMs = 1000;
     };
