@@ -32,12 +32,18 @@ async def dashboard_feed(websocket: WebSocket):
         try:
             raw = await asyncio.wait_for(websocket.receive_text(), timeout=5)
             token = json.loads(raw).get("token", "")
-        except Exception:
+        except Exception as exc:
+            logger.warning("Dashboard auth failed: no valid first message (%s)", type(exc).__name__)
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
         if not isinstance(token, str) or not hmac.compare_digest(
             token, settings.dashboard_token
         ):
+            logger.warning(
+                "Dashboard auth failed: token mismatch (client sent %d chars, expected %d)",
+                len(token) if isinstance(token, str) else -1,
+                len(settings.dashboard_token),
+            )
             await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
             return
 
