@@ -394,7 +394,13 @@
   }
 
   function connectWs() {
-    if (state.ws) { try { state.ws.close(); } catch (e) {} }
+    clearTimeout(state.wsTimer);
+    if (state.ws) {
+      // Detach handlers first: otherwise the old socket's onclose schedules
+      // another connectWs(), which closes this one, and so on forever.
+      state.ws.onclose = state.ws.onerror = state.ws.onmessage = state.ws.onopen = null;
+      try { state.ws.close(); } catch (e) {}
+    }
     const wsUrl = state.base.replace(/^http/, 'ws') + '/ws/dashboard'
       + (state.dashboardToken ? '?token=' + encodeURIComponent(state.dashboardToken) : '');
     setWsStatus('connecting', 'connecting…');
@@ -413,7 +419,8 @@
     };
     ws.onclose = () => {
       setWsStatus('down', 'disconnected — retrying…');
-      setTimeout(connectWs, state.wsRetryMs);
+      if (state.ws !== ws) return;
+      state.wsTimer = setTimeout(connectWs, state.wsRetryMs);
       state.wsRetryMs = Math.min(state.wsRetryMs * 1.6, 15000);
     };
     ws.onerror = () => { /* onclose will fire next, handled there */ };
