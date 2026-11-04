@@ -29,11 +29,11 @@ struct FakeHal : Hal {
   void log(const char *) override {}
 };
 
-struct Rep { ReportType type; std::string id; uint32_t valid; };
+struct Rep { ReportType type; std::string id; uint32_t valid; uint32_t value; };
 struct FakeNet : Net {
   std::vector<std::string> verifies; std::vector<Rep> reports; int manuals = 0;
   void requestVerify(const char *c) override { verifies.push_back(c); }
-  void queueReport(ReportType t, const char *id, uint32_t v) override { reports.push_back({t, id, v}); }
+  void queueReport(ReportType t, const char *id, uint32_t v, uint32_t value) override { reports.push_back({t, id, v, value}); }
   void queueManual() override { manuals++; }
   int count(ReportType t) { int n = 0; for (auto &r : reports) if (r.type == t) n++; return n; }
 };
@@ -64,6 +64,16 @@ TEST(granted_scan_energises_coil_and_beeps) {
   CHECK(!r.hal.coilV);                                   // not before the server says yes
   r.box.onVerifyResult(true, true, EV1, 10, 60);
   CHECK(r.hal.coilV && r.box.state() == State::Unlocked && std::string(r.box.eventId()) == EV1);
+}
+TEST(granted_scan_reports_unlock_with_response_time) {
+  Rig r; r.box.onScan(CODE); r.hal.t += 840;                 // the server takes 840 ms to answer
+  r.box.onVerifyResult(true, true, EV1, 10, 60);
+  CHECK(r.net.count(ReportType::Unlocked) == 1);
+  CHECK(r.net.reports.back().type == ReportType::Unlocked && r.net.reports.back().id == EV1 && r.net.reports.back().value == 840);
+}
+TEST(denied_scan_does_not_report_unlock) {
+  Rig r; r.box.onScan(CODE); r.hal.t += 500; r.box.onVerifyResult(true, false, "", 0, 0);
+  CHECK(r.net.count(ReportType::Unlocked) == 0);
 }
 TEST(denied_and_network_error_never_unlock) {
   Rig r; r.box.onScan(CODE); r.box.onVerifyResult(true, false, "", 0, 0);
@@ -141,7 +151,7 @@ TEST(door_bounce_shorter_than_debounce_is_ignored) {
   Rig r; r.grant();
   for (int i = 0; i < 6; i++) { r.hal.doorClosed = false; r.run(30); r.hal.doorClosed = true; r.run(30); }
   CHECK(r.box.state() == State::Unlocked && r.net.count(ReportType::DoorOpened) == 0);
-  r.run(200); CHECK(r.net.reports.empty());
+  r.run(200); CHECK(r.net.reports.size() == 1 && r.net.reports[0].type == ReportType::Unlocked);   // only the unlock report: no door report
 }
 TEST(opening_a_locked_door_is_tamper_but_rebound_after_lock_is_not) {
   Rig r; r.grant(); r.openDoor();

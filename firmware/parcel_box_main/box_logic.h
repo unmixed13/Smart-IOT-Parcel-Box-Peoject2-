@@ -80,7 +80,7 @@ class Hal {
   virtual void log(const char *msg) = 0;
 };
 
-enum class ReportType : uint8_t { DoorOpened, UnlockTimeout, Locked, DoorLeftOpen, Tamper };
+enum class ReportType : uint8_t { DoorOpened, UnlockTimeout, Locked, DoorLeftOpen, Tamper, Unlocked };
 
 inline const char *reportName(ReportType t) {
   switch (t) {
@@ -89,6 +89,7 @@ inline const char *reportName(ReportType t) {
     case ReportType::Locked:        return "locked";
     case ReportType::DoorLeftOpen:  return "door_ajar";
     case ReportType::Tamper:        return "tamper";
+    case ReportType::Unlocked:      return "unlocked";   // coil energised; `value` = response time in ms
   }
   return "";
 }
@@ -97,7 +98,7 @@ class Net {
  public:
   virtual ~Net() {}
   virtual void requestVerify(const char *code) = 0;                 // async
-  virtual void queueReport(ReportType t, const char *eventId, uint32_t validForMs) = 0;
+  virtual void queueReport(ReportType t, const char *eventId, uint32_t validForMs, uint32_t value = 0) = 0;
   virtual void queueManual() = 0;                                   // async
 };
 
@@ -111,12 +112,13 @@ class ReportQueue {
     char eventId[kIdLen];
     uint32_t createdAt;
     uint32_t validMs;
+    uint32_t value;        // optional payload (Unlocked: response time in ms)
     uint32_t nextTry;
     uint8_t attempts;
   };
   static const int kCap = 8;
 
-  void push(ReportType t, const char *eventId, uint32_t now, uint32_t validMs) {
+  void push(ReportType t, const char *eventId, uint32_t now, uint32_t validMs, uint32_t value = 0) {
     if (n_ == kCap) {  // full: the oldest report is the least useful one
       for (int i = 1; i < n_; i++) q_[i - 1] = q_[i];
       n_--;
@@ -128,6 +130,7 @@ class ReportQueue {
     it.eventId[kIdLen - 1] = 0;
     it.createdAt = now;
     it.validMs = validMs;
+    it.value = value;
     it.nextTry = now;
     it.attempts = 0;
   }
@@ -236,6 +239,7 @@ class BoxLogic {
     }
     unlockAt_ = now;
     logVerify("granted, coil on", replyMs);
+    reportEvent(ReportType::Unlocked, cfg_.unlockReportValidMs, replyMs);   // lets the server log the unlock time
     startBeep(kBeepConfirm);
   }
 
@@ -293,9 +297,9 @@ class BoxLogic {
 
   // The report is bound to an event; without an Event-ID (manual unlock whose
   // id has not arrived yet) there is nothing the server could match it to.
-  void reportEvent(ReportType t, uint32_t validMs) {
+  void reportEvent(ReportType t, uint32_t validMs, uint32_t value = 0) {
     if (!eventId_[0]) return;
-    net_.queueReport(t, eventId_, validMs);
+    net_.queueReport(t, eventId_, validMs, value);
   }
 
   void relock(uint32_t now) {

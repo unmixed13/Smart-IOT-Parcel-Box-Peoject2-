@@ -43,6 +43,7 @@ class EventType(str, enum.Enum):
     LOCKED = "locked"
     DOOR_AJAR = "door_ajar"
     MANUAL_UNLOCK = "manual_unlock"
+    UNLOCKED = "unlocked"   # lock released after a granted scan; notes carry the ESP32-measured response time
 
 
 class QRStatus(str, enum.Enum):

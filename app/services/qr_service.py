@@ -184,6 +184,15 @@ async def apply_device_event(db: AsyncSession, device: Device, req: DeviceEventR
             await db.rollback()
         return resp, out
 
+    if req.type == "unlocked":
+        # Log-only: the lock was released after a granted scan. The timestamp is the server time of this report;
+        # the exact scan -> coil time is measured on the ESP32 (millis) and sent as response_ms.
+        took = f"{req.response_ms} ms" if req.response_ms is not None else "n/a"
+        _log(db, device.device_id, EventType.UNLOCKED, AccessResult.GRANTED, f"lock released, response {took}, event {event.id}", event.code)
+        await db.commit()
+        out.broadcast.append({"event": "unlocked", "device_id": device.device_id, "event_id": str(event.id), "response_ms": req.response_ms})
+        return await done(True)
+
     if req.type == "door_opened":
         if event.status == QRStatus.UNLOCKING:
             event.status, event.used_at, event.door_open_since = QRStatus.USED, now, now

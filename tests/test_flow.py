@@ -227,3 +227,16 @@ def test_tamper_line_alert_is_rate_limited_but_every_tamper_is_logged(c, box):
     assert len([m for m in sent if "tampering" in m["text"]]) == 1
     logs = c.get("/api/hardware/logs?limit=50", headers=ADMIN).json()
     assert len([r for r in logs if r["event_type"] == "tamper" and r["device_id"] == box["id"]]) == 3
+
+
+def test_unlocked_report_is_logged_with_esp32_response_time(c, box):
+    qr = make_qr(c)
+    assert scan(c, box, qr["code"]).json()["granted"]
+    body = {"type": "unlocked", "event_id": qr["event_id"], "response_ms": 842}
+    r = c.post("/api/device/event", json=body, headers=box["esp"]).json()
+    assert r["accepted"] and r["status"] == "unlocking"                      # log-only: the QR state does not change
+    logs = c.get("/api/hardware/logs?limit=50", headers=ADMIN).json()
+    row = [x for x in logs if x["event_type"] == "unlocked" and qr["event_id"] in (x["notes"] or "")]
+    assert len(row) == 1 and row[0]["result"] == "granted" and "842 ms" in row[0]["notes"]
+    assert c.post("/api/device/event", json={"type": "unlocked", "response_ms": 5}, headers=box["esp"]).json()["accepted"] is False  # no event id
+    assert c.post("/api/device/event", json={"type": "unlocked", "event_id": qr["event_id"], "response_ms": -1}, headers=box["esp"]).status_code == 422

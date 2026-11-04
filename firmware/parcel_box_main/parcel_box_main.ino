@@ -134,9 +134,9 @@ class EspNet : public pb::Net {
     r.code[sizeof(r.code) - 1] = 0;
     xQueueOverwrite(verifyReqQ, &r);
   }
-  void queueReport(pb::ReportType t, const char *eventId, uint32_t validMs) override {
+  void queueReport(pb::ReportType t, const char *eventId, uint32_t validMs, uint32_t value) override {
     if (xSemaphoreTake(reportMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-      reportQueue.push(t, eventId, millis(), validMs);
+      reportQueue.push(t, eventId, millis(), validMs, value);
       xSemaphoreGive(reportMutex);
     }
   }
@@ -219,7 +219,10 @@ static void doReport() {
   if (!have) return;
 
   char body[160], resp[128];
-  if (it.eventId[0])
+  if (it.type == pb::ReportType::Unlocked)    // coil released: tell the server how long the verification took
+    snprintf(body, sizeof(body), "{\"type\":\"%s\",\"event_id\":\"%s\",\"response_ms\":%lu}",
+             pb::reportName(it.type), it.eventId, (unsigned long)it.value);
+  else if (it.eventId[0])
     snprintf(body, sizeof(body), "{\"type\":\"%s\",\"event_id\":\"%s\"}", pb::reportName(it.type), it.eventId);
   else
     snprintf(body, sizeof(body), "{\"type\":\"%s\"}", pb::reportName(it.type));

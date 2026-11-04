@@ -72,8 +72,9 @@ class QRVerifyResponse(BaseModel):
 
 
 class DeviceEventRequest(BaseModel):
-    type: Literal["door_opened", "unlock_timeout", "locked", "door_ajar", "manual_unlock", "tamper"]
+    type: Literal["door_opened", "unlock_timeout", "locked", "door_ajar", "manual_unlock", "tamper", "unlocked"]
     event_id: uuid.UUID | None = None  # required for everything except manual_unlock
+    response_ms: int | None = Field(default=None, ge=0, le=600_000)  # "unlocked" only: scan -> coil, measured on the ESP32
 
 
 class DeviceEventResponse(BaseModel):
