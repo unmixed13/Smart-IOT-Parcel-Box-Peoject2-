@@ -217,8 +217,9 @@ class BoxLogic {
     if (!verifying_) return;               // arrived after the 3 s limit: ignored (thesis)
     verifying_ = false;
     uint32_t now = hal_.millis();
-    if (!reachedServer) { startBeep(kBeepError); return; }
-    if (!granted) { startBeep(kBeepDenied); return; }
+    uint32_t replyMs = (uint32_t)(now - verifyAt_);   // scanner data received -> server answer (thesis Tverify)
+    if (!reachedServer) { logVerify("no reply", replyMs); startBeep(kBeepError); return; }
+    if (!granted) { logVerify("denied", replyMs); startBeep(kBeepDenied); return; }
     if (state_ == State::DoorOpen) return; // door opened while we were waiting
 
     if (unlockSec) cfg_.unlockMs = clampu(unlockSec * 1000UL, kUnlockMin, kUnlockMax);
@@ -234,6 +235,7 @@ class BoxLogic {
       else if (eventId && strcmp(eventId_, eventId) != 0) return;   // a different code: ignore
     }
     unlockAt_ = now;
+    logVerify("granted, coil on", replyMs);
     startBeep(kBeepConfirm);
   }
 
@@ -251,6 +253,14 @@ class BoxLogic {
 
  private:
   static uint32_t clampu(uint32_t v, uint32_t lo, uint32_t hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+  // One Serial line per verification, e.g. "[123456] verify: granted, coil on in 842 ms":
+  // the measured response time for thesis table 4.4 (limit 3000 ms, cfg_.verifyTimeoutMs).
+  void logVerify(const char *what, uint32_t ms) {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "verify: %s in %lu ms", what, (unsigned long)ms);
+    hal_.log(buf);
+  }
 
   void copyId(const char *id) {
     strncpy(eventId_, id ? id : "", kIdLen - 1);
